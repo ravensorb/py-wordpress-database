@@ -10,7 +10,7 @@ import boto3
 from mysql import connector
 from wpconfigr import WpConfigFile
 
-from wpdatabase.classes import Database
+from wpdatabase2.classes import WpDatabase
 
 
 def ensure(wp_config_filename, credentials):
@@ -29,7 +29,7 @@ def ensure(wp_config_filename, credentials):
     log = logging.getLogger(__name__)
 
     wp_config = WpConfigFile(filename=wp_config_filename)
-    database = Database(wp_config=wp_config)
+    database = WpDatabase(wp_config=wp_config)
 
     log.info('Checking if the specified database has already been set up...')
     if database.test_config():

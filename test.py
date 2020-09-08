@@ -1,3 +1,5 @@
+#!/usr/bin/python3 
+
 """ Run all the unit tests. """
 
 from subprocess import CalledProcessError, check_call
@@ -13,4 +15,4 @@ try:
 except CalledProcessError:
     exit(1)
 
-check_call(['coverage', 'report'])
+#check_call(['coverage', 'report'])

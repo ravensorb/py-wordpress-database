@@ -1,5 +1,5 @@
 [run]
 include =
-    wpdatabase/**
+    wpdatabase2/**
 omit =
     **/test_*.py

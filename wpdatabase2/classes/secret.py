@@ -6,7 +6,7 @@ import logging
 
 import boto3
 
-from wpdatabase.exceptions import RegionNotKnownError
+from wpdatabase2.exceptions import RegionNotKnownError
 
 
 class Secret():

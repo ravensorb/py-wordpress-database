@@ -5,8 +5,8 @@ wpdatabase CLI entrypoint.
 import argparse
 import logging
 
-import wpdatabase
-from wpdatabase.classes import Credentials
+import wpdatabase2
+from wpdatabase2.classes import WpCredentials
 
 
 def run_from_cli():
@@ -74,15 +74,15 @@ def run_from_cli():
         exit(3)
 
     if username:
-        credentials = Credentials.from_username_and_password(
+        credentials = WpCredentials.from_username_and_password(
             username=username,
             password=password)
     else:
-        credentials = Credentials.from_aws_secrets_manager(
+        credentials = WpCredentials.from_aws_secrets_manager(
             secret_id=secret_id,
             region=region)
 
-    wpdatabase.ensure(wp_config_filename=args.wp_config,
+    wpdatabase2.ensure(wp_config_filename=args.wp_config,
                       credentials=credentials)
 
 

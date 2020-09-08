@@ -1,10 +1,10 @@
 """ Database credentials. """
 
-from wpdatabase.classes import Secret
-from wpdatabase.exceptions import InvalidArgumentsError
+from wpdatabase2.classes import Secret
+from wpdatabase2.exceptions import InvalidArgumentsError
 
 
-class Credentials():
+class WpCredentials():
     """
     Represents a set of database credentials.
 
@@ -71,7 +71,7 @@ class Credentials():
         Returns:
             Credentials:     Credentials instance.
         """
-        return Credentials(aws_secret_id=secret_id, region=region)
+        return WpCredentials(aws_secret_id=secret_id, region=region)
 
     @staticmethod
     def from_username_and_password(username, password):
@@ -86,7 +86,7 @@ class Credentials():
         Returns:
             Credentials:    Credentials instance.
         """
-        return Credentials(username=username, password=password)
+        return WpCredentials(username=username, password=password)
 
     @property
     def username(self):
