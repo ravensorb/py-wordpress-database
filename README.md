@@ -63,6 +63,13 @@ wpdb = WpDatabase('path to wp-config.php')
 print(wpdb.get_database_version())
 ```
 
+## Library usage
+
+import wpdatabase2
+
+wpdb = WpDatabase('path to wp-config.php')
+print(wpdb.get_database_version())
+
 ## Development
 
 To install development dependencies:
