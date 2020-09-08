@@ -23,4 +23,4 @@ echo "Installing Locally"
 sudo python3 setup.py install
 echo "-------------------------------------------------------------------------------------------"
 
-rm -r wpdatabase.egg-info
+rm -r *.egg-info

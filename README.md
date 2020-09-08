@@ -2,6 +2,8 @@
 
 [![CircleCI](https://circleci.com/gh/ravensorb/py-wordpress-database/tree/master.svg?style=svg)](https://circleci.com/gh/ravensorb/py-wordpress-database/tree/master)
 
+**A big call out to @cariad for the original version of this library**
+
 A Python package that sets up a WordPress database.
 
 `wpdatabase2` will:
@@ -10,19 +12,19 @@ A Python package that sets up a WordPress database.
  - Create the database, if it doesn't exist already.
  - Create the WordPress user, if it doesn't exist already.
 
-`wpdatabase` is idempotent; if the database and the user already exist then it will return successfully.
+`wpdatabase2` is idempotent; if the database and the user already exist then it will return successfully.
 
-Note that `wpdatabase` currently only supports MySQL databases.
+Note that `wpdatabase2` currently only supports MySQL databases.
 
 ## Installation
 
 ```shell
-pip install wpdatabase
+pip install wpdatabase2
 ```
 
 ## Prerequisites
 
-`wpdatabase` assumes that the following properties have already been set in the `wp-config.php` file:
+`wpdatabase2` assumes that the following properties have already been set in the `wp-config.php` file:
 
 | Property      | Description
 |-              |-
@@ -37,25 +39,29 @@ If you need help adding these values to `wp-config.php` then check out [wpconfig
 If you need to specify to the database's administrator username and password:
 
 ```shell
-python -m wpdatabase2 --wp-config      /www/wp-config.php \
-                     --admin-username garnet \
-                     --admin-password love
+python -m wpdatabase2 
+        --wp-config      /www/wp-config.php \
+        --admin-username garnet \
+        --admin-password love
 ```
 
 If you're deploying WordPress into Amazon Web Services (AWS) and have your administrator username and password held in Secrets Manager:
 
 ```shell
-python -m wpdatabase2 --wp-config                       /www/wp-config.php \
-                     --admin-credentials-aws-secret-id AdminSecretID \
-                     --admin-credentials-aws-region    eu-west-1
+python -m wpdatabase2 
+        --wp-config                       /www/wp-config.php \
+        --admin-credentials-aws-secret-id AdminSecretID \
+        --admin-credentials-aws-region    eu-west-1
 ```
 
 ## Library usage
 
+```python
 import wpdatabase2
 
 wpdb = WpDatabase('path to wp-config.php')
 print(wpdb.get_database_version())
+```
 
 ## Development
 
