@@ -28,7 +28,8 @@ class CredentialsTestCase(unittest.TestCase):
             password='password')
 
         self.assertTrue(isinstance(instance, WpCredentials))
-
+        self.assertEqual(instance.username, 'username', 'User name shoulld be "username"')
+        self.assertEqual(instance.password, 'password', 'Password shoulld be "password"')
 
 if __name__ == '__main__':
     unittest.main()

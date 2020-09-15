@@ -27,7 +27,7 @@ class DatabaseTestCase(unittest.TestCase):
         Assert that from_aws_secrets_manager() returns a class instance.
         """
 
-        instance = WpDatabase(WpConnection(db_host='127.0.0.1:3306', db_name='wp_default', credentials=WpCredentials.from_username_and_password('root', 'password')))
+        instance = WpDatabase(wp_connection=WpConnection(db_host='127.0.0.1:3306', db_name='wp_default', credentials=WpCredentials.from_username_and_password('root', 'password')))
 
         self.assertTrue(isinstance(instance, WpDatabase))
         self.assertTrue(isinstance(instance.connection, WpConnection))
@@ -43,11 +43,10 @@ class DatabaseTestCase(unittest.TestCase):
         dbSettings = self._load_settings()
         self.assertTrue(dbSettings is not None, "test_settings.json must exist...")           
 
-        instance = WpDatabase(
-                        WpConnection(
-                            db_host=dbSettings["dbHost"], 
-                            db_name=dbSettings["dbName"], 
-                            credentials=WpCredentials.from_username_and_password(dbSettings["dbUser"], dbSettings["dbPassword"])))
+        instance = WpDatabase(wp_connection=WpConnection(
+                                                        db_host=dbSettings["dbHost"], 
+                                                        db_name=dbSettings["dbName"], 
+                                                        credentials=WpCredentials.from_username_and_password(dbSettings["dbUser"], dbSettings["dbPassword"])))
         
         self.assertTrue(instance.test_config(), "Database connection failed")
 
@@ -56,11 +55,10 @@ class DatabaseTestCase(unittest.TestCase):
         dbSettings = self._load_settings()
         self.assertTrue(dbSettings is not None, "test_settings.json must exist...")           
 
-        instance = WpDatabase(
-                        WpConnection(
-                            db_host=dbSettings["dbHost"], 
-                            db_name=dbSettings["dbName"], 
-                            credentials=WpCredentials.from_username_and_password(dbSettings["dbUser"], dbSettings["dbPassword"])))
+        instance = WpDatabase(wp_connection=WpConnection(
+                                                        db_host=dbSettings["dbHost"], 
+                                                        db_name=dbSettings["dbName"], 
+                                                        credentials=WpCredentials.from_username_and_password(dbSettings["dbUser"], dbSettings["dbPassword"])))
 
         wpVer = instance.get_database_version()
         self.assertTrue(wpVer is not None and wpVer.wp_version is not None, "Wordpress Version returned '{}'".format(wpVer))

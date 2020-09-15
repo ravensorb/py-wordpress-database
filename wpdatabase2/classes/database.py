@@ -2,6 +2,7 @@
 
 from logging import getLogger
 from mysql import connector
+from wpconfigr import WpConfigFile
 from wpdatabase2.classes.connection import WpConnection
 from wpdatabase2.classes.credentials import WpCredentials
 from wpdatabase2.exceptions import InvalidArgumentsError
@@ -15,25 +16,41 @@ class WpDatabase():
         connection (Connection): WordPress configuration.
     """
 
-    def __init__(self, wp_config):
+    ###########################################################################
+    def __init__(self, wp_config = None, wp_connection = None):
+        """
+        Constructor for Wpdatabase.ArithmeticError
+        Note: Only wp_config OR wp_connection is required
+
+        Args:
+            wp_config (WpConfigFile, optional):     A WpConfigFile object
+            connection (WpConnection, optional):    A WpConnection object
+        """
+        
         self._log = getLogger(__name__)
 
-        self._wp_config = wp_config
-        self._wp_connection = WpConnection(self._wp_config.get('DB_HOST'), WpCredentials.from_username_and_password(self._wp_config.get('DB_USER'), self._wp_config.get('DB_PASSWORD')))
+        if (wp_config is None and wp_connection is None):
+            raise InvalidArgumentsError("Must specify at least one valid parameter (wp_config wp_connect)")
 
-    def __init__(self, connection):
-        self._log = getLogger(__name__)
+        if (wp_config is not None):
+            if (not isinstance(wp_config, WpConfigFile)):
+                raise InvalidArgumentsError("wp_config must be an instance of WpConfigFile")
 
-        if (not isinstance(connection, WpConnection)):
-            raise InvalidArgumentError("Invalid connection object")
+            self._wp_config = wp_config
+            self._wp_connection = WpConnection(self._wp_config.get('DB_HOST'), WpCredentials.from_username_and_password(self._wp_config.get('DB_USER'), self._wp_config.get('DB_PASSWORD')))
+        elif (wp_connection is not None):
+            if (not isinstance(wp_connection, WpConnection)):
+                raise InvalidArgumentsError("Invalid connection object")
 
-        self._wp_connection = connection
-
+            self._wp_connection = wp_connection
+            
+    ###########################################################################
     @property
     def connection(self):
         """ Gets the connection details. """
         return self._wp_connection
 
+    ###########################################################################
     def _connect(self, credentials):
         """
         Gets a connection to the database.
@@ -57,6 +74,7 @@ class WpDatabase():
                                  user=credentials.username,
                                  password=credentials.password)
 
+    ###########################################################################
     def test_config(self, throw=False):
         """
         Tests the connection details in the WordPress configuration.
@@ -81,6 +99,7 @@ class WpDatabase():
             cur.close()
             conn.close()
 
+    ###########################################################################
     def does_database_exist(self):
         """
         Checks to see if the database exists
@@ -91,6 +110,7 @@ class WpDatabase():
 
         return self._test_config(False)
 
+    ###########################################################################
     def get_database_version(self):
         """
         Returns the wordpress version (if it is configured)
@@ -119,6 +139,7 @@ class WpDatabase():
             conn.close()
 
 
+    ###########################################################################
     def ensure_database_setup(self, admin_credentials):
         """
         Ensure the database is set up to match the WordPress configuration.
@@ -168,21 +189,26 @@ class WpDatabase():
 
         self._log.info('Database setup is complete.')
 
+###########################################################################
+###########################################################################
 
 class WpDatabaseVersion():
     def __init__(self, ver):
         self._db_version = ver
 
+    ###########################################################################
     @property
     def db_version(self):
         """ WordPress Raw Database Version Number """
         return self._db_version
 
+    ###########################################################################
     @property
     def wp_version(self):
         """ WordPress Published Version Number """
         return self._wordPressVersions[self._db_version] if self._db_version in self._wordPressVersions else None
 
+    ###########################################################################
     _wordPressVersions = {
         "2540" : "1.2.2",
         "2541" : "1.5.2",

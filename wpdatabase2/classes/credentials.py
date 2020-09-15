@@ -51,6 +51,7 @@ class WpCredentials():
         else:
             self._secret = None
 
+    ###########################################################################
     def _resolve_secret(self):
         if not self._secret:
             return
@@ -58,6 +59,7 @@ class WpCredentials():
         self._password = self._secret.as_dict['password']
         self._secret = None
 
+    ###########################################################################
     @staticmethod
     def from_aws_secrets_manager(secret_id, region):
         """
@@ -73,6 +75,7 @@ class WpCredentials():
         """
         return WpCredentials(aws_secret_id=secret_id, region=region)
 
+    ###########################################################################
     @staticmethod
     def from_username_and_password(username, password):
         """
@@ -88,12 +91,14 @@ class WpCredentials():
         """
         return WpCredentials(username=username, password=password)
 
+    ###########################################################################
     @property
     def username(self):
         """ Gets the username. """
         self._resolve_secret()
         return self._username
 
+    ###########################################################################
     @property
     def password(self):
         """ Gets the password. """

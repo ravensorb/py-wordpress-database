@@ -36,9 +36,23 @@ class WpConnection():
             raise InvalidArgumentsError(
                 'Must specify a database credentials.')
 
-        self._db_name = db_name
+        self.db_name = db_name
+        self.db_host = db_host
+        self.credentials = credentials
 
-        host_parts = db_host.split(':')
+        self._log.debug('Host="%s", Port="%s", Name="%s"', self.db_host, self.db_port, self.db_name)
+
+    ###########################################################################
+    @property
+    def db_host(self):
+        """ Gets the database host. """
+        return self._db_host
+
+    ###########################################################################
+    @db_host.setter
+    def db_host(self, value):
+        """ Gets the database host. """
+        host_parts = value.split(':')
         self._db_host = host_parts[0]
 
         if len(host_parts) == 2:
@@ -46,26 +60,38 @@ class WpConnection():
         else:
             self._db_port = None
 
-        self._credentials = credentials
-
-        self._log.debug('Host="%s", Port="%s", Name="%s"', self.db_host, self.db_port, self.db_name)
-
-    @property
-    def db_host(self):
-        """ Gets the username. """
-        return self._db_host
-
+    ###########################################################################
     @property
     def db_port(self):
         """ Gets the database port. """
         return self._db_port
 
+    ###########################################################################
+    @db_port.setter
+    def db_port(self, value):
+        """ Gets the database port. """
+        self._db_port = value    
+
+    ###########################################################################
     @property
     def db_name(self):
         """ Gets the database name. """
         return self._db_name
 
+    ###########################################################################
+    @db_name.setter
+    def db_name(self, value):
+        """ Sets the database name. """
+        self._db_name = value    
+
+    ###########################################################################
     @property
     def credentials(self):
         """ Gets the credentials. """
         return self._credentials
+
+    ###########################################################################
+    @credentials.setter
+    def credentials(self, value):
+        """ Sets the database credentials. """
+        self._credentials = value    

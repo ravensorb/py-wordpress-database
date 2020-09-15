@@ -10,8 +10,14 @@ import boto3
 from mysql import connector
 from wpconfigr import WpConfigFile
 
+from wpdatabase2.classes import Secret
+from wpdatabase2.classes import WpCredentials
+from wpdatabase2.classes import WpConnection
 from wpdatabase2.classes import WpDatabase
 
+from wpdatabase2.exceptions.invalid_arguments import InvalidArgumentsError # pylint: disable=line-too-long
+from wpdatabase2.exceptions.invalid_database_name import InvalidDatabaseNameError # pylint: disable=line-too-long
+from wpdatabase2.exceptions.region_not_known import RegionNotKnownError
 
 def ensure(wp_config_filename, credentials):
     """
