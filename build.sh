@@ -1,8 +1,10 @@
 #!/bin/bash
 
-#echo "-------------------------------------------------------------------------------------------"
-#echo "Incrementing Version..."
-#bumpversion --current-version 0.3.0 minor setup.py wpbackup2/__init__.py
+echo "-------------------------------------------------------------------------------------------"
+echo "Incrementing Version..."
+if [ "$1" == "bump" ]; then
+    bumpversion patch
+fi
 
 echo "-------------------------------------------------------------------------------------------"
 echo "Building..."
