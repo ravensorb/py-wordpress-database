@@ -30,7 +30,7 @@ setup(
     },
     install_requires=[
         'boto3~=1.9.0',
-        'mysql-connector~=2.1.0',
+        'mysql-connector>=2.1.0',
         'wpconfigr~=1.0.0'
     ],
     name='wpdatabase2',
@@ -43,4 +43,4 @@ setup(
         'wpdatabase2.exceptions'
     ],
     url='https://github.com/ravensorb/py-wordpress-database',
-    version='0.0.2')
+    version='0.0.3')

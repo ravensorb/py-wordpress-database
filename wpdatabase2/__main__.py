@@ -7,12 +7,15 @@ import logging
 
 import wpdatabase2
 from wpdatabase2.classes import WpCredentials
-
+from wpdatabase2.__version__ import __version__
 
 def run_from_cli():
     """ Perform an update instigated from a CLI. """
 
     arg_parser = argparse.ArgumentParser()
+
+    arg_parser.add_argument('--version', action='version',
+                    version='%(prog)s {version}'.format(version=__version__))
 
     arg_parser.add_argument(
         '--admin-credentials-aws-secret-id',
