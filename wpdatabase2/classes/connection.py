@@ -1,9 +1,9 @@
 """ Database connection details. """
 
 from logging import getLogger
-from wpdatabase2.classes import Secret
-from wpdatabase2.classes import WpCredentials
-from wpdatabase2.exceptions import InvalidArgumentsError
+#from wpdatabase2.classes import Secret
+#from wpdatabase2.classes import WpCredentials
+#from wpdatabase2.exceptions import InvalidArgumentsError
 
 class WpConnection():
     """
@@ -28,7 +28,7 @@ class WpConnection():
         self.db_host = db_host
         self.credentials = credentials
 
-        self._log.debug('Host="%s", Port="%s", Name="%s"', self.db_host, self.db_port, self.db_name)
+        self._log.debug('Host="%s", Port="%s", Name="%s"', self.db_host, self.db_port, self.db_name) # pylint: disable=line-too-long
 
     ###########################################################################
     @property

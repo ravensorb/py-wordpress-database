@@ -1,8 +1,10 @@
 """ Common database functionality. """
 
+# pylint: disable=line-too-long
+
 from logging import getLogger
-from mysql import connector
 from wpconfigr import WpConfigFile
+from mysql import connector
 from wpdatabase2.classes.connection import WpConnection
 from wpdatabase2.classes.credentials import WpCredentials
 from wpdatabase2.exceptions import InvalidArgumentsError
@@ -17,7 +19,7 @@ class WpDatabase():
     """
 
     ###########################################################################
-    def __init__(self, wp_config = None, wp_connection = None):
+    def __init__(self, wp_config=None, wp_connection=None):
         """
         Constructor for Wpdatabase.ArithmeticError
         Note: Only wp_config OR wp_connection is required
@@ -26,24 +28,26 @@ class WpDatabase():
             wp_config (WpConfigFile, optional):     A WpConfigFile object
             connection (WpConnection, optional):    A WpConnection object
         """
-        
+
         self._log = getLogger(__name__)
 
         if (wp_config is None and wp_connection is None):
             raise InvalidArgumentsError("Must specify at least one valid parameter (wp_config wp_connect)")
 
-        if (wp_config is not None):
-            if (not isinstance(wp_config, WpConfigFile)):
+        if wp_config is not None:
+            if not isinstance(wp_config, WpConfigFile):
                 raise InvalidArgumentsError("wp_config must be an instance of WpConfigFile")
 
             self._wp_config = wp_config
-            self._wp_connection = WpConnection(self._wp_config.get('DB_HOST'), WpCredentials.from_username_and_password(self._wp_config.get('DB_USER'), self._wp_config.get('DB_PASSWORD')))
-        elif (wp_connection is not None):
-            if (not isinstance(wp_connection, WpConnection)):
+            self._wp_connection = WpConnection(db_host=self._wp_config.get('DB_HOST'),
+                                               db_name=self._wp_config.get('DB_NAME'),
+                                               credentials=WpCredentials.from_username_and_password(self._wp_config.get('DB_USER'), self._wp_config.get('DB_PASSWORD')))
+        elif wp_connection is not None:
+            if not isinstance(wp_connection, WpConnection):
                 raise InvalidArgumentsError("Invalid connection object")
 
             self._wp_connection = wp_connection
-            
+
     ###########################################################################
     @property
     def connection(self):
@@ -61,7 +65,7 @@ class WpDatabase():
         Returns:
             MySQLConnection: Database connection.
         """
-    
+
         self._log.info('Attempting to connect...')
 
         if self._wp_connection.db_port:
@@ -108,7 +112,7 @@ class WpDatabase():
             bool: Success.
         """
 
-        return self._test_config(False)
+        return self.test_config(False)
 
     ###########################################################################
     def get_database_version(self):
@@ -126,8 +130,8 @@ class WpDatabase():
             cur.execute("USE {}".format(self._wp_connection.db_name))
             cur.execute("SELECT option_value FROM `wp_options` where option_name = 'db_version'")
             record = cur.fetchone()
-            
-            if (record is None):
+
+            if record is None:
                 return None
 
             return WpDatabaseVersion(record[0])
@@ -156,8 +160,9 @@ class WpDatabase():
                 self._log.error('Failed to execute: %s', cur.statement)
                 raise error
 
-        if (self.does_database_exist()):
-            self._log.info('Database already "%s" exists...', self._wp_connection.db_name)
+        if self.does_database_exist():
+            self._log.info('Database already "%s" exists...',
+                           self._wp_connection.db_name)
             return
 
         conn = self._connect(admin_credentials)
@@ -193,6 +198,7 @@ class WpDatabase():
 ###########################################################################
 
 class WpDatabaseVersion():
+    """ Database Version details """
     def __init__(self, ver):
         self._db_version = ver
 
