@@ -43,4 +43,4 @@ setup(
         'wpdatabase2.exceptions'
     ],
     url='https://github.com/ravensorb/py-wordpress-database',
-    version='0.0.4')
+    version='0.0.5')
