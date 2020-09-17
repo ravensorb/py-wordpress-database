@@ -93,15 +93,15 @@ class WpDatabase():
             cur = conn.cursor()
             cur.execute("USE {}".format(self._wp_connection.db_name))
 
+            cur.close()
+            conn.close()
+
             return True
 
         except connector.errors.ProgrammingError as error:
             if throw:
                 raise error
             return False
-        finally:
-            cur.close()
-            conn.close()
 
     ###########################################################################
     def does_database_exist(self):
@@ -130,6 +130,8 @@ class WpDatabase():
             cur.execute("USE {}".format(self._wp_connection.db_name))
             cur.execute("SELECT option_value FROM `wp_options` where option_name = 'db_version'")
             record = cur.fetchone()
+            cur.close()
+            conn.close()
 
             if record is None:
                 return None
@@ -138,10 +140,6 @@ class WpDatabase():
         except connector.errors.ProgrammingError as error:
             self._log.error('Failed to execute: %s', cur.statement)
             raise error
-        finally:
-            cur.close()
-            conn.close()
-
 
     ###########################################################################
     def ensure_database_setup(self, admin_credentials):
