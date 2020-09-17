@@ -7,8 +7,9 @@ import logging
 
 import boto3
 
-from mysql import connector
 from wpconfigr import WpConfigFile
+
+from mysql import connector
 
 from wpdatabase2.classes import Secret
 from wpdatabase2.classes import WpCredentials
@@ -43,7 +44,7 @@ def ensure(wp_config_filename, credentials):
         return
 
     log.info('Could not connect, so will set up the database.')
-    database.ensure_database_setup(credentials=credentials)
+    database.ensure_database_setup(admin_credentials=credentials)
 
     log.info('Validating the database setup...')
     if database.test_config(throw=True):
