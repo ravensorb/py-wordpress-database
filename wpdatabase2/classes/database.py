@@ -170,6 +170,7 @@ class WpDatabase():
         self._log.info('Ensuring database "%s" exists...', self._wp_connection.db_name)
         # Database names cannot be parameterized, so be careful.
         cur_exec('CREATE DATABASE IF NOT EXISTS {n};')
+        #cur_exec('CREATE USER ''%s''@''*'' IDENTIFIED BY ''%s''', self._wp_connection.credentials.usernane, self._wp_connection.credentials.password)
 
         self._log.info('Using database "%s"...', self._wp_connection.db_name)
         cur_exec('USE {n};')
