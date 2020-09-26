@@ -89,6 +89,9 @@ class WpCredentials():
         Returns:
             Credentials:    Credentials instance.
         """
+        if (not username) != (not password):
+            return None
+        
         return WpCredentials(username=username, password=password)
 
     ###########################################################################
