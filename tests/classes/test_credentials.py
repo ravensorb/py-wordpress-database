@@ -31,5 +31,27 @@ class CredentialsTestCase(unittest.TestCase):
         self.assertEqual(instance.username, 'username', 'User name shoulld be "username"')
         self.assertEqual(instance.password, 'password', 'Password shoulld be "password"')
 
+    def test_from_username_and_password_username_none(self):
+        """
+        Assert that from_username_and_password() returns a none if user name is None.
+        """
+
+        instance = WpCredentials.from_username_and_password(
+            username=None,
+            password='password')
+
+        self.assertIsNone(instance)
+
+    def test_from_username_and_password_password_none(self):
+        """
+        Assert that from_username_and_password() returns a none if password is None.
+        """
+
+        instance = WpCredentials.from_username_and_password(
+            username='username',
+            password=None)
+
+        self.assertIsNone(instance)
+
 if __name__ == '__main__':
     unittest.main()

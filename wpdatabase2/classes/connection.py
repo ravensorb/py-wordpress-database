@@ -39,6 +39,11 @@ class WpConnection():
     ###########################################################################
     @db_host.setter
     def db_host(self, value):
+        if value is None:
+            self._db_host = None
+            self._db_port = None
+            return
+        
         """ Gets the database host. """
         host_parts = value.split(':')
         self._db_host = host_parts[0]
