@@ -9,4 +9,3 @@ from wpdatabase2.classes.connection import WpConnection
 
 from wpdatabase2.classes.database import WpDatabase
 from wpdatabase2.classes.database import WpDatabaseVersion
-

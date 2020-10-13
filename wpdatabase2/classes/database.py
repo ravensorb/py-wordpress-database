@@ -158,7 +158,7 @@ class WpDatabase():
             except connector.errors.ProgrammingError as error:
                 self._log.error('Failed to execute: %s', cur.statement)
                 raise error
-                
+
         if self.does_database_exist() and not force:
             self._log.info('Database already "%s" exists...',
                            self._wp_connection.db_name)
