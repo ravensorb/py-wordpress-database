@@ -88,12 +88,12 @@ class WpDatabase():
         """
 
         try:
-            conn = self._connect(self._wp_connection.credentials)
+            with self._connect(self._wp_connection.credentials) as conn:
 
-            cur = conn.cursor()
-            cur.execute("USE {}".format(self._wp_connection.db_name))
+                with conn.cursor() as cur:
+                    cur.execute("USE {}".format(self._wp_connection.db_name))
 
-            cur.close()
+                cur.close()
             conn.close()
 
             return True
@@ -142,12 +142,13 @@ class WpDatabase():
             raise error
 
     ###########################################################################
-    def ensure_database_setup(self, admin_credentials):
+    def ensure_database_setup(self, admin_credentials, force = False):
         """
         Ensure the database is set up to match the WordPress configuration.
 
         Args:
             admin_credentials (Credentials): Database admin credentials.
+            force: force the database creation (don't check to see if it already exists)
         """
 
         def cur_exec(statement, params=None):
@@ -157,8 +158,8 @@ class WpDatabase():
             except connector.errors.ProgrammingError as error:
                 self._log.error('Failed to execute: %s', cur.statement)
                 raise error
-
-        if self.does_database_exist():
+                
+        if self.does_database_exist() and not force:
             self._log.info('Database already "%s" exists...',
                            self._wp_connection.db_name)
             return
