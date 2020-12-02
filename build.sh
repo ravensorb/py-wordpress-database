@@ -6,6 +6,9 @@ rm -f dist/*
 
 if [ "$1" == "bump" ]; then
     echo "-------------------------------------------------------------------------------------------"
+    echo "Staging changes with git"    
+    git stage .
+    git commit
     echo "Incrementing Version..."
     python3 -m bumpversion --list patch
 fi

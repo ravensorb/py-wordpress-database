@@ -86,7 +86,8 @@ def run_from_cli():
             region=region)
 
     wpdatabase2.ensure(wp_config_filename=args.wp_config,
-                      credentials=credentials)
+                      credentials=credentials,
+                      force=False)
 
 
 if __name__ == '__main__':

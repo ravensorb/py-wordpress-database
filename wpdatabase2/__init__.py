@@ -20,7 +20,7 @@ from wpdatabase2.exceptions.invalid_arguments import InvalidArgumentsError # py
 from wpdatabase2.exceptions.invalid_database_name import InvalidDatabaseNameError # pylint: disable=line-too-long
 from wpdatabase2.exceptions.region_not_known import RegionNotKnownError
 
-def ensure(wp_config_filename, credentials):
+def ensure(wp_config_filename, credentials, force = False):
     """
     Ensures that a WordPress database is set up according to the configuration
     in "wp-config.php".
@@ -39,12 +39,12 @@ def ensure(wp_config_filename, credentials):
     database = WpDatabase(wp_config=wp_config)
 
     log.info('Checking if the specified database has already been set up...')
-    if database.test_config():
+    if database.test_config() and not force:
         log.info('Successfully connected.')
         return
 
     log.info('Could not connect, so will set up the database.')
-    database.ensure_database_setup(admin_credentials=credentials)
+    database.ensure_database_setup(admin_credentials=credentials, force=force)
 
     log.info('Validating the database setup...')
     if database.test_config(throw=True):
