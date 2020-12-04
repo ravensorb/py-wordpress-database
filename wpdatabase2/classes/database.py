@@ -98,7 +98,7 @@ class WpDatabase():
 
             return True
 
-        except connector.errors.ProgrammingError as error:
+        except Exception as error:
             if throw:
                 raise error
             return False
