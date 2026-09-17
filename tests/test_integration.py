@@ -232,3 +232,24 @@ def test_a_wrong_table_prefix_is_reported_not_silently_empty(suffix: str) -> Non
     with pytest.raises(AccessDeniedError) as caught:
         site(suffix).database_version(table_prefix="definitely_not_")
     assert "table prefix" in str(caught.value)
+
+
+def test_no_credential_appears_in_logs_during_real_provisioning(suffix: str) -> None:
+    """The provisioning path is the one that logs an action list.
+
+    Unit coverage coaxes credentials through inspect(); this covers the path
+    that actually emits `actions=[...]`, including the ALTER USER step whose
+    action text names the account whose password was just set.
+    """
+    import structlog
+
+    secret = "integration-only-secret-value"
+    db = site(suffix, password=secret)
+    with structlog.testing.capture_logs() as captured:
+        result = db.ensure(admin())
+    assert result.ok
+    rendered = repr(captured)
+    assert secret not in rendered, f"a log event carried the password: {rendered}"
+    # The action list should name what happened without quoting the value.
+    assert any("set password" in action for action in result.actions)
+    assert all(secret not in action for action in result.actions)
