@@ -1,0 +1,196 @@
+# l3io-wp-database publishing.
+#
+# Deliberately a separate file from ci.yml, not a guarded job inside it. act has
+# no OIDC and ignores `job.permissions` entirely, so an `if:` guard would not
+# protect this from running locally -- file separation is the only reliable
+# boundary, and .actrc/Makefile pin act to ci.yml.
+#
+# The default dispatch target is `mirror`, the internal Gitea registry, because
+# Gitea packages can be deleted whereas PyPI and TestPyPI burn a filename
+# permanently: a mistake there costs the version number forever. So the first
+# ever run of this workflow can happen somewhere reversible.
+#
+# PyPI is reachable only by explicit dispatch, never by pushing a tag.
+
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        type: choice
+        options: [mirror, testpypi, pypi]
+        default: mirror
+
+permissions: {}
+
+jobs:
+  version-gate:
+    # A tag must agree with the version the package will actually publish.
+    # Disagreement means the artifact and the git history describe different
+    # releases, which is unrecoverable once a filename is burned.
+    name: version gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+
+      - name: validate the tag format
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: tag
+        uses: LiquidLogicLabs/git-action-tag-validate-version@v2
+        with:
+          tag: ${{ github.ref_name }}
+          version-type: semver
+
+      - name: the tag must match the packaged version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.tag.outputs.is-valid }}" != "true" ]; then
+            echo "::error::${{ github.ref_name }} is not a valid semver tag"
+            exit 1
+          fi
+          packaged=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          tagged="${GITHUB_REF_NAME#v}"
+          if [ "$packaged" != "$tagged" ]; then
+            echo "::error::tag $tagged does not match pyproject version $packaged"
+            exit 1
+          fi
+          echo "tag and packaged version agree on $packaged"
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [version-gate]
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-publish-build
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.11.6"
+      # --no-sources is load-bearing: l3io-wp-config is consumed from a git rev
+      # during development, and a VCS dependency in published metadata is the
+      # defect that left the predecessor package unresolvable for six years.
+      - run: uv build --no-sources
+      - name: no development source reached the dependency metadata
+        run: uv run python tools/check_dist_metadata.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    # The artifact that will be published must install clean and import, in an
+    # environment that has never seen this source tree.
+    name: smoke · py${{ matrix.python }}
+    runs-on: ubuntu-latest
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.11.6"
+          python-version: ${{ matrix.python }}
+      - name: install and import
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" \
+                 python -c "from l3io.wp import database; print('import ok', database.__version__)"
+      - name: the console script runs
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" l3io-wp-database --version
+      - name: base install pulls no optional dependency
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" \
+                 python - <<'PY'
+          import importlib.util, sys
+          for forbidden in ("boto3", "botocore", "l3io.wp.config"):
+              if importlib.util.find_spec(forbidden) is not None:
+                  sys.exit(f"base install pulled {forbidden}")
+          print("base install is clean")
+          PY
+
+  publish-mirror:
+    # The internal Gitea registry. Token auth, because a Gitea registry does not
+    # support trusted publishing. Skipped entirely when the variable is unset,
+    # so a fork or a clean clone is unaffected.
+    name: mirror to internal registry
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    # Gated on the TARGET as well as the URL. Without the event condition this
+    # would run on every trigger, so a TestPyPI dry run would also push here --
+    # publishing somewhere the operator did not choose.
+    if: >-
+      vars.PYPI_CUSTOM_URL != '' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       (github.event_name == 'workflow_dispatch' && inputs.target == 'mirror'))
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.11.6"
+      - name: upload to Gitea
+        env:
+          UV_PUBLISH_URL: ${{ vars.PYPI_CUSTOM_URL }}
+          UV_PUBLISH_USERNAME: ${{ secrets.PYPI_CUSTOM_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+        run: uv publish dist/*
+
+  publish-testpypi:
+    # Requires a TestPyPI trusted publisher for this repository. Until one is
+    # configured this target will fail at the publish step rather than silently
+    # doing nothing -- which is the preferable failure.
+    name: TestPyPI
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    # Never tag-triggered. PyPI burns a filename permanently, so reaching it
+    # takes a deliberate dispatch with the target named explicitly.
+    #
+    # Nothing may go to PyPI until every dependency beneath it can resolve from
+    # PyPI too: publishing this while l3io-wp-config exists only on the internal
+    # registry would make `pip install l3io-wp-database[wpconfig]` unresolvable,
+    # reproducing the outage this rewrite exists to repair.
+    name: PyPI
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@release/v1

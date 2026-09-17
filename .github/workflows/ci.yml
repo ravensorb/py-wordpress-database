@@ -1,0 +1,271 @@
+# l3io-wp-database CI.
+#
+# Every mechanical gate this package relies on runs here, and every job also
+# runs locally under nektos/act with no edits. Publishing lives in publish.yml,
+# which act never runs: act ignores `job.permissions` and has no OIDC, so a
+# guard expression would not protect it. File separation is the only reliable
+# boundary.
+#
+# Gates on vars.LOCAL_ACT, never env.ACT -- env.ACT does not work in a
+# job-level `if:`, and Gitea's runners also set ACT=true.
+#
+# setup-uv is pinned to an EXACT version, not a floating major. astral-sh
+# stopped publishing floating major tags after v7: refs/tags/v1..v7 exist, but
+# v8, v9 and v10 ship only as exact versions (v10.0.0, v10.0.1, v10.1.0). So
+# `setup-uv@v10` cannot resolve -- on GitHub Actions or under act. Verified with
+# `git ls-remote`. Bump this deliberately.
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# No UV_FROZEN: uv rejects `--locked` when it is set, and --locked is wanted
+# because it asserts the lockfile is current rather than merely using it.
+
+jobs:
+  static:
+    name: lint · format · types
+    runs-on: ubuntu-latest
+    env:
+      # act binds the developer's real checkout as the workspace and runs as
+      # root, so a venv inside the tree is shared across parallel matrix jobs
+      # and left root-owned afterwards. Keep every environment outside it.
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-static
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
+        with:
+          version: "0.11.6"
+          enable-cache: ${{ !vars.LOCAL_ACT }}
+      - run: uv sync --locked --all-extras --dev
+      - name: ruff lint
+        run: uv run ruff check --output-format=github .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy --strict
+
+  contracts:
+    name: architecture contracts
+    runs-on: ubuntu-latest
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-contracts
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
+        with:
+          version: "0.11.6"
+          enable-cache: ${{ !vars.LOCAL_ACT }}
+      - run: uv sync --locked --all-extras --dev
+
+      # AD-27 -- the namespace guard. Includes the coexistence test, which
+      # builds a stub sibling distribution and installs both into one isolated
+      # interpreter. A single-package check cannot catch this: adding
+      # l3io/__init__.py shadows the namespace and makes siblings unimportable
+      # while every other test in the suite still passes.
+      - name: AD-27 namespace contracts
+        run: uv run pytest tests/test_architecture.py -q
+
+      # AD-27 scope attack -- derive the forbidden set from the tree rather
+      # than trusting the test, so a marker file added anywhere above the area
+      # package fails here too.
+      - name: AD-27 no namespace marker files
+        run: |
+          if find src/l3io -maxdepth 2 -name '__init__.py' | grep -q .; then
+            echo "::error::AD-27 -- __init__.py above src/l3io/wp/database/ shadows the namespace"
+            find src/l3io -maxdepth 2 -name '__init__.py'
+            exit 1
+          fi
+
+      # AD-28 -- grant-target escaping. The unit tests assert the two quoting
+      # functions differ; the reachability proof needs a server and runs in the
+      # test job below.
+      - name: AD-28 identifier escaping
+        run: uv run pytest tests/test_identifiers.py -q
+
+  test:
+    name: py${{ matrix.python }} · ${{ matrix.engine.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Under act the matrix collapses to one representative leg, driven by
+        # vars.LOCAL_ACT rather than by `if:` branching -- one code path, two
+        # inputs. Not a convenience: act creates every leg's service container
+        # up front and runs the job container with --network host, so nine legs
+        # all try to bind host port 3306 and eight fail with "port is already
+        # allocated". --concurrent-jobs 1 does not help, because the allocation
+        # happens before any job starts. On GitHub each leg has its own runner.
+        python: >-
+          ${{ vars.LOCAL_ACT && fromJSON('["3.11"]')
+              || fromJSON('["3.11","3.12","3.13"]') }}
+        # The engine carries its own image and health probe as one object, so
+        # there is no `include:` block. An include entry whose keys do not match
+        # an existing combination ADDS a leg rather than extending one, which
+        # silently produced legs with no python value when the engine list was
+        # collapsed above. Keeping the data in the matrix value makes that
+        # impossible.
+        #
+        # 8.0 is the only server where mysql_native_password is still active, so
+        # an 8.4-only matrix never exercises the auth-plugin divergence the
+        # matrix exists to catch. It left Extended Support on 2026-04-30 and is
+        # carried deliberately, because WordPress hosts still run it.
+        engine: >-
+          ${{ vars.LOCAL_ACT
+              && fromJSON('[{"name":"mysql80","image":"mysql:8.0","health":"mysqladmin ping -h 127.0.0.1 -uroot -proot"}]')
+              || fromJSON('[{"name":"mysql80","image":"mysql:8.0","health":"mysqladmin ping -h 127.0.0.1 -uroot -proot"},{"name":"mysql84","image":"mysql:8.4","health":"mysqladmin ping -h 127.0.0.1 -uroot -proot"},{"name":"mariadb","image":"mariadb:11.4","health":"healthcheck.sh --connect --innodb_initialized"}]') }}
+    services:
+      db:
+        image: ${{ matrix.engine.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="${{ matrix.engine.health }}"
+          --health-interval=5s --health-timeout=5s
+          --health-retries=20 --health-start-period=30s
+    env:
+      # GitHub runs the job on the VM, so services are on 127.0.0.1.
+      # act runs the job in a container, so they resolve by service label.
+      # .act.vars sets DB_HOST=db.
+      DB_HOST: ${{ vars.DB_HOST || '127.0.0.1' }}
+      DB_PORT: '3306'
+      DB_ADMIN_USER: root
+      DB_ADMIN_PASSWORD: root
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-py${{ matrix.python }}-${{ matrix.engine.name }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
+        with:
+          version: "0.11.6"
+          python-version: ${{ matrix.python }}
+          enable-cache: ${{ !vars.LOCAL_ACT }}
+      - run: uv sync --locked --all-extras --dev
+      - name: pytest
+        # DB_HOST is set, so the integration tests run rather than skip. They
+        # cover the portable CREATE USER / ALTER USER / GRANT sequence on every
+        # engine, idempotence with zero writes on a second run, password
+        # convergence, and the AD-28 reachability proof.
+        run: >-
+          uv run pytest -q
+          --cov=l3io.wp.database --cov-report=term-missing --cov-report=xml
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [static, contracts, test]
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-build
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
+        with:
+          version: "0.11.6"
+      # --no-sources is required, not cosmetic: l3io-wp-config is consumed from
+      # git during development, and a VCS dependency reaching published
+      # metadata is exactly the defect that left the predecessor package
+      # unresolvable for six years.
+      - run: uv build --no-sources
+      - name: no development source reached the dependency metadata
+        # Inspect Requires-Dist LINES specifically. A hostname search over the
+        # whole file cries wolf -- Project-URL entries and the README carried in
+        # the long description both legitimately contain github.com -- and a
+        # check that cries wolf gets switched off.
+        run: uv run python tools/check_dist_metadata.py
+      - name: upload the distributions
+        # GitHub-only, and not a gate. Both artifact majors were tested under
+        # act 0.2.89 rather than assumed:
+        #
+        #   v7 -> rejected outright. `Error decode request body: unknown field
+        #         "mime_type"`, five retries, then failure. act's artifact
+        #         server does not speak v7's protocol.
+        #   v4 -> full round-trip succeeds under act. But v4 runs on Node 20,
+        #         which leaves the runner images on 2026-09-23, so it works in
+        #         both places only until then and fails on GitHub after.
+        #
+        # So neither version can serve a gate that must run in both places,
+        # which is why verify-install below builds its own wheel instead. The
+        # upload stays on v7 because it is GitHub-only and v7 is what survives.
+        #
+        # Nothing depends on this upload: verify-install below builds its own
+        # wheel rather than consuming an artifact, so the gate runs identically
+        # here and locally. The upload exists for release and for inspection.
+        if: ${{ !vars.LOCAL_ACT }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  verify-install:
+    # Installs a BUILT WHEEL into a clean isolated environment. Installing the
+    # working tree would have passed throughout the entire six years the
+    # predecessor package could not be installed from PyPI at all -- that is
+    # the blind spot this closes, and it closes it against an artifact rather
+    # than against the source directory.
+    #
+    # It builds its own wheel instead of downloading the one `build` uploaded.
+    # That is deliberate: act's artifact server cannot accept the upload, so a
+    # download-based job could only ever run on GitHub -- and the most
+    # dangerous invariant should not be the one with no local coverage. One
+    # code path, running identically in both places, is worth more than
+    # verifying the exact published bytes in only one of them.
+    name: clean install · py${{ matrix.python }}
+    runs-on: ubuntu-latest
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        python: >-
+          ${{ vars.LOCAL_ACT && fromJSON('["3.11"]')
+              || fromJSON('["3.11","3.12","3.13"]') }}
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-verify-${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.11.6"
+          python-version: ${{ matrix.python }}
+          enable-cache: ${{ !vars.LOCAL_ACT }}
+      - name: build the distributions
+        run: uv build --no-sources --out-dir dist-verify
+      - name: no development source reached the dependency metadata
+        run: uv run python tools/check_dist_metadata.py --dist dist-verify
+      - name: install the wheel into an isolated environment and import it
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist-verify/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" \
+                 python -c "from l3io.wp import database; import sys; print('import ok', database.__version__, sys.version)"
+      - name: base install pulls no optional dependency
+        # AD-8 -- an optional dependency is an optional import. None of these
+        # may arrive unless their extra was asked for.
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist-verify/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" \
+                 python - <<'PY'
+          import importlib.util, sys
+          for forbidden in ("boto3", "botocore", "l3io.wp.config"):
+              if importlib.util.find_spec(forbidden) is not None:
+                  sys.exit(f"AD-8 -- base install pulled {forbidden}")
+          print("base install is clean")
+          PY
+      - name: the console script is installed and runs
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist-verify/*.whl)
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+                 --with "$wheel" l3io-wp-database --version
