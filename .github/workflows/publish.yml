@@ -17,6 +17,10 @@ name: Publish
 on:
   push:
     tags: ['v*']
+  # A published GitHub Release also mirrors, so "cut a release" is enough and
+  # nobody has to remember a second step.
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       target:
@@ -28,6 +32,39 @@ on:
 permissions: {}
 
 jobs:
+  preflight:
+    # Decides whether the Gitea mirror is configured, and publishes that as an
+    # OUTPUT rather than letting the mirror job test it directly.
+    #
+    # This indirection is required, not stylistic. The `secrets` context is NOT
+    # available in a job-level (or step-level) `if:` -- only github, needs, vars
+    # and inputs are. So `if: secrets.FOO != ''` does not error; it evaluates
+    # empty and SILENTLY SKIPS the job. A publish that quietly does not happen is
+    # the worst available outcome, so the secret is read here in a step `env`,
+    # where the context IS available, and reduced to a boolean.
+    name: preflight
+    runs-on: ubuntu-latest
+    outputs:
+      mirror_enabled: ${{ steps.check.outputs.mirror_enabled }}
+    steps:
+      - name: is the Gitea mirror configured?
+        id: check
+        env:
+          MIRROR_URL: ${{ vars.PYPI_CUSTOM_URL }}
+          MIRROR_USER: ${{ secrets.PYPI_CUSTOM_USERNAME }}
+          MIRROR_TOKEN: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MIRROR_URL}" ] && [ -n "${MIRROR_USER}" ] && [ -n "${MIRROR_TOKEN}" ]; then
+            echo "mirror_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "mirror configured at ${MIRROR_URL}"
+          else
+            echo "mirror_enabled=false" >> "$GITHUB_OUTPUT"
+            # `${VAR:+set}` reports presence without ever echoing a value.
+            echo "mirror not configured, skipping it:" \
+                 "url:${MIRROR_URL:+set} user:${MIRROR_USER:+set} token:${MIRROR_TOKEN:+set}"
+          fi
+
   version-gate:
     # A tag must agree with the version the package will actually publish.
     # Disagreement means the artifact and the git history describe different
@@ -130,19 +167,45 @@ jobs:
           print("base install is clean")
           PY
 
+      - name: AD-27 the published artifact does not shadow the namespace
+        # Re-checked here, not only in ci.yml, because this is the last point
+        # before the bytes leave: ci.yml guards the source tree, and a build or
+        # packaging change could introduce a marker file that the source check
+        # never sees. Asserted against the WHEEL, which is the thing published.
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl)
+          python3 - "$wheel" <<'PY'
+          import sys, zipfile
+          names = zipfile.ZipFile(sys.argv[1]).namelist()
+          # Scope assertion first, so this cannot pass over an empty set the way
+          # a bare "no forbidden entries" test would on an empty or wrong wheel.
+          area = "l3io/wp/database/__init__.py"
+          if area not in names:
+              sys.exit(f"AD-27 -- {area} absent; wrong or empty wheel, guard would be vacuous")
+          for forbidden in ("l3io/__init__.py", "l3io/wp/__init__.py"):
+              if forbidden in names:
+                  sys.exit(f"AD-27 -- {forbidden} in the wheel shadows the shared namespace "
+                           "and makes the sibling distributions unimportable")
+          print("namespace clean in the wheel: no marker file above the area package")
+          PY
+
   publish-mirror:
     # The internal Gitea registry. Token auth, because a Gitea registry does not
     # support trusted publishing. Skipped entirely when the variable is unset,
     # so a fork or a clean clone is unaffected.
     name: mirror to internal registry
     runs-on: ubuntu-latest
-    needs: [smoke]
-    # Gated on the TARGET as well as the URL. Without the event condition this
-    # would run on every trigger, so a TestPyPI dry run would also push here --
-    # publishing somewhere the operator did not choose.
+    needs: [smoke, preflight]
+    # Auto-publishes whenever the mirror is configured AND this is a release
+    # event -- a v* tag, a published GitHub Release, or an explicit mirror
+    # dispatch. Still gated on the TARGET as well: without the event condition
+    # this would run on every trigger, so a TestPyPI dry run would also push
+    # here, publishing somewhere the operator did not choose.
     if: >-
-      vars.PYPI_CUSTOM_URL != '' &&
+      needs.preflight.outputs.mirror_enabled == 'true' &&
       (startsWith(github.ref, 'refs/tags/v') ||
+       github.event_name == 'release' ||
        (github.event_name == 'workflow_dispatch' && inputs.target == 'mirror'))
     steps:
       - uses: actions/download-artifact@v8
@@ -150,12 +213,80 @@ jobs:
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           version: "0.11.6"
+      - name: is this version already on the registry?
+        # Makes a re-run idempotent. `uv publish --check-url` does NOT do this:
+        # its check URL is the authenticated simple index and the check does not
+        # receive the publish credentials, so it falls through to uploading and
+        # 409s anyway. Verified by a sibling package's first tag run.
+        #
+        # Name and version come from the WHEEL FILENAME, not pyproject.toml --
+        # this job downloads an artifact and never checks out the repo, so
+        # reading pyproject would be a FileNotFoundError. The wheel is also the
+        # better source: the question is whether THOSE artifacts are present,
+        # not what the repo currently declares.
+        id: exists
+        env:
+          MIRROR_URL: ${{ vars.PYPI_CUSTOM_URL }}
+          MIRROR_USER: ${{ secrets.PYPI_CUSTOM_USERNAME }}
+          MIRROR_TOKEN: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl | head -1)
+          base=$(basename "$wheel")
+          # PEP 503 normalisation: the wheel says l3io_wp_database, the index
+          # wants l3io-wp-database.
+          name=$(printf '%s' "${base%%-*}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[-_.]+/-/g')
+          echo "looking for $base under $name"
+          code=$(curl -sS -o /tmp/simple.html -w '%{http_code}' \
+                   -u "${MIRROR_USER}:${MIRROR_TOKEN}" \
+                   "${MIRROR_URL%/}/simple/${name}/" || echo "000")
+          # Skip ONLY on an explicit 200 that already lists this exact file. A
+          # 404, a 000 transport error, or a 200 without the file all publish and
+          # let the registry be the authority rather than skipping on ambiguity.
+          if [ "$code" = "200" ] && grep -qF "$base" /tmp/simple.html; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$base is already on the registry; skipping upload"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "not present (index HTTP $code); will publish"
+          fi
+
       - name: upload to Gitea
+        if: steps.exists.outputs.already_published != 'true'
         env:
           UV_PUBLISH_URL: ${{ vars.PYPI_CUSTOM_URL }}
           UV_PUBLISH_USERNAME: ${{ secrets.PYPI_CUSTOM_USERNAME }}
           UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
         run: uv publish dist/*
+
+  release:
+    # Creates the GitHub Release for a tag, with the artifacts attached.
+    #
+    # Deliberately does NOT depend on publish-mirror. A sibling package's first
+    # tag run went red on the mirror with a 409 and the release survived only
+    # because of that independence -- a registry problem must not cost a release.
+    #
+    # Gated on `event_name == 'push'` rather than `!= 'release'`: when the
+    # trigger IS a published release the release already exists, and the positive
+    # spelling says what it means instead of enumerating what it is not.
+    name: GitHub release
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: dist, path: dist }
+      - name: create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
 
   publish-testpypi:
     # Requires a TestPyPI trusted publisher for this repository. Until one is

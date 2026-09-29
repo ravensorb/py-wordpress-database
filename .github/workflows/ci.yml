@@ -78,6 +78,16 @@ jobs:
       # package fails here too.
       - name: AD-27 no namespace marker files
         run: |
+          set -euo pipefail
+          # Assert the SCOPE before asserting the rule. Without this the guard
+          # passes on a tree that has no src/l3io at all: find writes to stderr,
+          # stdout is empty, `grep -q` matches nothing, the `if` is false, and the
+          # step reports success over an empty set. "No marker files" and "no tree"
+          # produced the same green, and the log did not distinguish them.
+          if [ ! -d src/l3io ]; then
+            echo "::error::AD-27 -- src/l3io does not exist, so this guard would pass vacuously"
+            exit 1
+          fi
           if find src/l3io -maxdepth 2 -name '__init__.py' | grep -q .; then
             echo "::error::AD-27 -- __init__.py above src/l3io/wp/database/ shadows the namespace"
             find src/l3io -maxdepth 2 -name '__init__.py'
