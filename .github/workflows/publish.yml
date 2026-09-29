@@ -83,7 +83,12 @@ jobs:
           tag: ${{ github.ref_name }}
           version-type: semver
 
-      - name: the tag must match the packaged version
+      - name: the tag is valid semver
+        # Only the FORMAT is checked here. pyproject no longer carries a version
+        # literal to compare against -- the version is dynamic, resolved by
+        # hatchling from the one literal in _version.py -- so grepping it here
+        # would compare against nothing. The tag/version agreement is asserted in
+        # `smoke`, against the built wheel, which is the value that gets published.
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
@@ -91,13 +96,7 @@ jobs:
             echo "::error::${{ github.ref_name }} is not a valid semver tag"
             exit 1
           fi
-          packaged=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
-          tagged="${GITHUB_REF_NAME#v}"
-          if [ "$packaged" != "$tagged" ]; then
-            echo "::error::tag $tagged does not match pyproject version $packaged"
-            exit 1
-          fi
-          echo "tag and packaged version agree on $packaged"
+          echo "${GITHUB_REF_NAME} is valid semver"
 
   build:
     name: build
@@ -140,23 +139,107 @@ jobs:
         with:
           version: "0.11.6"
           python-version: ${{ matrix.python }}
-      - name: install and import
+      - name: install, import, and agree on one version
+        # The Python Packaging User Guide's recommended check for a project that
+        # single-sources its version: assert that the import package's
+        # __version__ and the DISTRIBUTION metadata report the same string.
+        # https://packaging.python.org/en/latest/discussions/single-source-version/
+        #
+        # Run against the installed wheel rather than the source tree, because
+        # the two values are produced by different mechanisms -- the attribute is
+        # a literal in _version.py, the metadata is what hatchling resolved at
+        # build time -- and only the built artifact exercises both.
         run: |
           set -euo pipefail
-          wheel=$(ls dist/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" \
-                 python -c "from l3io.wp import database; print('import ok', database.__version__)"
+                 python - <<'PY'
+          from importlib.metadata import version
+          from l3io.wp import database
+          attr = database.__version__
+          dist = version("l3io-wp-database")
+          if attr != dist:
+              raise SystemExit(
+                  f"version drift: l3io.wp.database.__version__ is {attr!r} "
+                  f"but the l3io-wp-database distribution reports {dist!r}"
+              )
+          print(f"import ok, one version: {attr}")
+          PY
+
+      - name: a tag must agree with the artifact it publishes
+        # The authoritative tag check, moved here from version-gate because this
+        # is where the artifact exists. Compares the tag against the wheel's own
+        # metadata, so it covers the tag, pyproject's dynamic resolution and the
+        # _version.py literal in a single assertion -- and cannot pass by reading
+        # a value the build did not actually use.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
+          built=$(uv run --isolated --no-project --python "${{ matrix.python }}" \
+                    --with "$wheel" \
+                    python -c "from importlib.metadata import version; print(version('l3io-wp-database'))")
+          tagged="${GITHUB_REF_NAME#v}"
+          if [ "$built" != "$tagged" ]; then
+            echo "::error::tag $tagged does not match the built version $built"
+            exit 1
+          fi
+          echo "tag and artifact agree on $built"
       - name: the console script runs
         run: |
           set -euo pipefail
-          wheel=$(ls dist/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" l3io-wp-database --version
       - name: base install pulls no optional dependency
         run: |
           set -euo pipefail
-          wheel=$(ls dist/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" \
                  python - <<'PY'
@@ -174,7 +257,18 @@ jobs:
         # never sees. Asserted against the WHEEL, which is the thing published.
         run: |
           set -euo pipefail
-          wheel=$(ls dist/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
           python3 - "$wheel" <<'PY'
           import sys, zipfile
           names = zipfile.ZipFile(sys.argv[1]).namelist()
@@ -231,7 +325,18 @@ jobs:
           MIRROR_TOKEN: ${{ secrets.PYPI_CUSTOM_PASSWORD }}
         run: |
           set -euo pipefail
-          wheel=$(ls dist/*.whl | head -1)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist/, found $count"
+            find dist -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
           base=$(basename "$wheel")
           # PEP 503 normalisation: the wheel says l3io_wp_database, the index
           # wants l3io-wp-database.
@@ -276,17 +381,51 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }  # hatch-vcs needs tags; shallow yields 0.1.devN
       - uses: actions/download-artifact@v8
         with: { name: dist, path: dist }
-      - name: create the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: the version without its v prefix
+        id: version
         run: |
           set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+          echo "number=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: read this version's entry from the changelog
+        # Turns "update the changelog before releasing" from a habit into a gate:
+        # validation-level=error fails the release when CHANGELOG.md has no entry
+        # for the tag being released, so the notes cannot silently go missing.
+        #
+        # Written to a file rather than an output because the entry is long and
+        # contains backticks, pipes and quotes -- passing it through a YAML
+        # expression mangles it.
+        id: changelog
+        uses: LiquidLogicLabs/git-action-changelog-parser@v3.0.14
+        with:
+          path: CHANGELOG.md
+          version: ${{ steps.version.outputs.number }}
+          validation-level: error
+          output-file: .release-notes.md
+
+      - name: create the release
+        # The org's action rather than `gh release create`, because it speaks
+        # GitHub and Gitea both -- the same step can publish the release to the
+        # self-hosted instance later without a second implementation.
+        uses: LiquidLogicLabs/git-action-release@v2.0.11
+        with:
+          platform: github
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          artifacts: dist/*
+          # The hand-written entry, not generated notes. The changelog records
+          # intent -- why a behaviour changed, and one case where it deliberately
+          # did not -- which a commit list cannot reconstruct.
+          body-file: .release-notes.md
+          # A release is cut once. Refuse to overwrite one, because the registry
+          # filename behind it is already spent.
+          allow-updates: 'false'
 
   publish-testpypi:
     # Requires a TestPyPI trusted publisher for this repository. Until one is

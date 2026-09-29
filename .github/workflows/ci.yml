@@ -40,6 +40,7 @@ jobs:
       UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-static
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }  # hatch-vcs needs tags; shallow yields 0.1.devN
       - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
         with:
           version: "0.11.6"
@@ -59,6 +60,7 @@ jobs:
       UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-contracts
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }  # hatch-vcs needs tags; shallow yields 0.1.devN
       - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
         with:
           version: "0.11.6"
@@ -156,6 +158,7 @@ jobs:
       UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-py${{ matrix.python }}-${{ matrix.engine.name }}
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }  # hatch-vcs needs tags; shallow yields 0.1.devN
       - uses: astral-sh/setup-uv@v10.1.0  # no floating v10 ref exists; see comment at top
         with:
           version: "0.11.6"
@@ -245,6 +248,7 @@ jobs:
       UV_PROJECT_ENVIRONMENT: /tmp/l3io-venv-verify-${{ matrix.python }}
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }  # hatch-vcs needs tags; shallow yields 0.1.devN
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           version: "0.11.6"
@@ -257,7 +261,18 @@ jobs:
       - name: install the wheel into an isolated environment and import it
         run: |
           set -euo pipefail
-          wheel=$(ls dist-verify/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist-verify -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist-verify/, found $count"
+            find dist-verify -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist-verify -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" \
                  python -c "from l3io.wp import database; import sys; print('import ok', database.__version__, sys.version)"
@@ -266,7 +281,18 @@ jobs:
         # may arrive unless their extra was asked for.
         run: |
           set -euo pipefail
-          wheel=$(ls dist-verify/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist-verify -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist-verify/, found $count"
+            find dist-verify -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist-verify -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" \
                  python - <<'PY'
@@ -279,6 +305,17 @@ jobs:
       - name: the console script is installed and runs
         run: |
           set -euo pipefail
-          wheel=$(ls dist-verify/*.whl)
+          # Exactly one wheel, asserted rather than assumed. `ls dist/*.whl`
+          # returns every match, so a stale artifact in the directory silently
+          # expands to two paths and the command downstream gets a nonsense
+          # argument. A real runner starts empty; act binds the working tree,
+          # which is how this was found.
+          count=$(find dist-verify -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in dist-verify/, found $count"
+            find dist-verify -maxdepth 1 -name '*.whl'
+            exit 1
+          fi
+          wheel=$(find dist-verify -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
                  --with "$wheel" l3io-wp-database --version

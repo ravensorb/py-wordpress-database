@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from l3io.wp.database import __version__
 from l3io.wp.database.cli import Exit, main
 
 
@@ -18,7 +19,10 @@ def test_version_exits_cleanly(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as caught:
         main(["--version"])
     assert caught.value.code == 0
-    assert "1.0.0" in capsys.readouterr().out
+    # Compared against the package's own value, not a literal. The version comes
+    # from the git tag (AD-30), so a literal here would be a second source that
+    # breaks on every release -- and it did, which is how this was found.
+    assert __version__ in capsys.readouterr().out
 
 
 def test_no_source_is_a_usage_error() -> None:

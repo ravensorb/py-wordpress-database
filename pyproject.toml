@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "l3io-wp-database"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Create and inspect WordPress MySQL databases and their users, idempotently."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -86,6 +86,10 @@ dev = [
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
   "types-pymysql>=1.2.0.20260807",
+  # The contract tests read the workflow files. A maintained parser, because the
+  # one thing this repo's rules will not tolerate is a hand-written YAML parser.
+  "pyyaml==6.0.3",
+  "types-pyyaml==6.0.12.20260906",
   # The optional extras are dev dependencies too, so a bare `uv run` can
   # exercise the code paths behind them. `uv run` syncs the default groups
   # only, which PRUNES extras -- without this, every `uv run` silently
@@ -101,6 +105,23 @@ dev = [
 # AD-27: l3io.wp is a PEP 420 native namespace. Ship no __init__.py at
 # src/l3io/ or src/l3io/wp/ -- doing so shadows the namespace and makes the
 # sibling distributions unimportable, while this package's own tests still pass.
+[tool.hatch.version]
+# AD-30: the git tag IS the version. There is no literal anywhere in this repo
+# to drift from it -- not in pyproject, not in the package -- so "keep the tag
+# and the package in sync" is not a rule anyone can break.
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# PyPI rejects local version labels, so a dev build must not carry +g<sha>.
+local_scheme = "no-local-version"
+# Only three-component tags count. Without this the abandoned 2018 `v1.0` tag
+# is the nearest ancestor of every commit on main, and setuptools-scm reads its
+# two components and guesses the next MINOR: builds came out as 1.1.dev39, which
+# sorts ABOVE 1.0.0 in PEP 440. Publishing one would have permanently outranked
+# the real release. With the match, an untagged tree falls back to 0.1.devN,
+# which sorts below any real version -- wrong in the safe direction.
+git_describe_command = "git describe --dirty --tags --long --match v[0-9]*.[0-9]*.[0-9]*"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/l3io"]
 

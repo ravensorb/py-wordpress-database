@@ -1,10 +1,10 @@
 # Changelog
 
-## 1.0.0 — unreleased
+## [1.0.0] - 2026-09-29
 
 A full internal rewrite. The package is renamed, re-namespaced, and its
 behaviour corrected. Nothing is preserved from the `wpdatabase2` public API;
-see [Migrating](#migrating-from-wpdatabase2).
+see [docs/migration.md](docs/migration.md).
 
 ### Renamed
 
@@ -83,15 +83,3 @@ and passed them straight to the connection, and the CLI exited non-zero when
 neither source was given. The defect was in a sibling package. It is recorded
 here only because the handoff asked for a changelog entry, and describing a
 change that did not happen would be worse than saying so.
-
-## Migrating from `wpdatabase2`
-
-| Before | After |
-|---|---|
-| `import wpdatabase2` | `from l3io.wp import database` |
-| `wpdatabase2.ensure(path, credentials)` | `WpDatabase(WpConfigSource(path).connection()).ensure(admin)` |
-| `WpConnection(db_host=..., db_name=...)` | `WpConnection.from_db_host(db_host=..., db_name=...)` |
-| `credentials.username` | `credentials.resolve().username` |
-| `db.test_config()` | `db.inspect().is_ready` |
-| `db.does_database_exist()` | `db.inspect()` — six states, not a boolean |
-| `except mysql.connector.Error` | `except WpDatabaseError` |
