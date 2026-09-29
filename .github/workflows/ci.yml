@@ -133,9 +133,12 @@ jobs:
           --health-interval=5s --health-timeout=5s
           --health-retries=20 --health-start-period=30s
     env:
-      # GitHub runs the job on the VM, so services are on 127.0.0.1.
-      # act runs the job in a container, so they resolve by service label.
-      # .act.vars sets DB_HOST=db.
+      # 127.0.0.1 on BOTH GitHub and act, so .act.vars deliberately leaves
+      # DB_HOST unset and this default applies in both places. act's default
+      # network is `host` (`--network` defaults to "host"), so a service LABEL
+      # fails DNS outright and the published port appears on the loopback
+      # address -- the same place GitHub's VM runner puts it. Do NOT set
+      # DB_HOST=db: that only applies if act is given a user-defined network.
       DB_HOST: ${{ vars.DB_HOST || '127.0.0.1' }}
       DB_PORT: '3306'
       DB_ADMIN_USER: root

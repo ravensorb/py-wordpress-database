@@ -1,0 +1,135 @@
+# Handoff — wordpress-database
+
+> **Resume line:** You are `wordpress-database`. Read `docs/handoff/wordpress-database.md` in
+> this repo, then continue.
+
+Written 2026-09-27, at `main` = `945069bf` plus three uncommitted changes (below).
+
+## What I own
+
+This repository only: `l3io-wp-database`, second in a three-package family. The siblings are
+owned by other sessions — `wordpress-config` (`l3io-wp-config`, release position 1) and
+`wordpress-backup` (`l3io-wp-backup`, position 3). Do not edit their repos; message them.
+
+The package is a full rewrite of the abandoned `wpdatabase2`: new distribution, new PEP 420
+namespace `l3io.wp.database`, nothing preserved from the old surface, no shim.
+
+## Read first, in this order
+
+1. `AGENTS.md` — the operating rules. Eleven lines, each a trap actually hit. The
+   `__init__.py` prohibition is the one that breaks *other* packages if ignored.
+2. `_bmad-output/planning-artifacts/prds/prd-py-wordpress-database-2026-09-15/prd.md` —
+   `status: final`, reconciled against `945069bf`. **§11 "Shipped state" is the fastest way to
+   learn what actually exists.** Superseded requirements keep their text with reasons; items
+   marked DEFERRED or PARTIALLY are genuinely not done.
+3. `.memlog.md` beside it — 81 entries, the authoritative decision record with reasoning. Go
+   here before re-deciding anything.
+4. `CHANGELOG.md` — every behaviour change, including one the upstream handoff asked for that
+   was rejected with evidence.
+5. The family's architecture spine and ADRs live in **`py-wordpress-backup`**, not here:
+   `_bmad-output/planning-artifacts/architecture/.../ARCHITECTURE-SPINE.md` (29 invariants,
+   AD-n) and `docs/adr/`. AD-2, AD-8, AD-9, AD-14, AD-27, AD-28, AD-29 bind this package.
+
+## State
+
+- [done] Rewrite merged to `main`; 15 jobs green on real GitHub Actions (lint/format/types,
+  architecture contracts, 9 test legs, build, 3 clean-install legs).
+- [done] 90 unit/contract + 13 integration tests; integration verified against MySQL 8.0, 8.4
+  and MariaDB 11.4.
+- [done] `make ci` replays all five jobs locally under `act`; `make verify-wheel` is the
+  fast standalone equivalent.
+- [done] PRD reconciled to `final` and addendum corrected.
+- [todo] **Commit and push three uncommitted tracked changes**: `.github/workflows/ci.yml`
+  (a stale comment fix), `pyproject.toml` and `uv.lock` (dependency pin moved from a rev to
+  tag `v1.5.0`). All gates pass with them in place; they are simply uncommitted.
+- [todo] Delete or deliberately keep the tag **`v1.0`** — a 2018 predecessor tag on
+  `6b88f31`, already pushed, and a live match for `publish.yml`'s `v*` trigger.
+- [todo] Decide where the architecture record lives: a local doc here, or a pointer from
+  `AGENTS.md` to the backup repo's spine. My recommendation was the pointer, on the grounds
+  that duplicating 29 invariants across three repos guarantees drift. Not decided.
+- [todo] FR-23 — second credential provider. Not implemented; only AWS. Recommendation
+  changed from Azure Key Vault to a **dependency-free env-var provider**, which proves the
+  interface is not AWS-shaped without adding an SDK.
+- [todo] FR-29 — correlation identifier. Not implemented. Either build it or retire it
+  deliberately; review argued it adds little for a single-threaded six-statement fan-out, but
+  nobody made that call.
+- [todo] FR-48 — no check that `requires-python` and the CI matrices agree. Three hand-kept
+  copies of one fact; a global-rule-#4 violation.
+- [todo] FR-50 — no scripted name-conflict release gate. The release path relies on memory,
+  which the requirement forbids.
+- [todo] FR-45 — no `security-audit` workflow. Nothing scans dependencies or the lock.
+- [todo] G5 — **no MySQL 9.x test leg**, and 9.x is the generation FR-8/FR-9 exist for, since
+  9.0 removed `mysql_native_password`. Cheapest coverage gain available.
+- [blocked] **Any PyPI release.** `l3io-wp-config` is tagged, released and mirrored to the
+  internal Gitea registry but is **not resolvable from PyPI** — a GitHub Release is not an
+  index. Publishing this package while that holds makes
+  `pip install l3io-wp-database[wpconfig]` unresolvable, reproducing the exact outage this
+  rewrite repairs. Family invariant AD-15. Publication goes bottom-up: config, then database,
+  then backup.
+- [blocked] Nothing is published anywhere. `publish.yml` is registered and dispatchable but
+  has never run; `l3io-wp-database` returns 404 from the Gitea index. Release is Shawn's call,
+  not an agent's. The first run should target `mirror` — Gitea packages are deletable, PyPI
+  burns a filename permanently.
+
+## Corrections the next session inherits — and which I re-tested myself
+
+The peer session asking for this handoff was right that these matter more than the findings,
+because you inherit my conclusions without my evidence. Stated precisely:
+
+- [done] **"act switches to a bridge network when services exist, so services resolve by
+  service label" — FALSE.** act defaults to `--network host`, so services are on `127.0.0.1`
+  and a label fails DNS outright. **I re-tested this myself, both ways**: `DB_HOST=db` fails
+  every integration test; leaving it unset passes all of them.
+- [done] **`setup-uv@v10` cannot resolve anywhere** — astral-sh publishes no floating major
+  past v7; v8/v9/v10 exist only as exact versions. **I verified this myself** with
+  `git ls-remote`, and saw the act run fail with `couldn't find remote ref "v10"` before
+  pinning `v10.1.0`. Applies to GitHub Actions too, not just act.
+- [todo] **MariaDB floor is 10.2, not 10.1** — `CREATE USER IF NOT EXISTS` works on 10.1.48
+  but `ALTER USER` fails with `ERROR 1064`, and the sequence needs both. **I did NOT re-test
+  this myself.** It came from a feasibility-review subagent, and I propagated it into NFR-4,
+  the shared KB note and two peer sessions on that basis. My own integration runs used MariaDB
+  11.4, well above either candidate floor, so nothing in this repo's suite exercises 10.1 or
+  10.2. **Re-verify before relying on it.**
+
+Others worth knowing, all of which I did confirm directly:
+
+- [done] The PRD's §2 once claimed `ERROR 1064` was reproduced through the code path. It is
+  not reachable there — the old driver fails on `caching_sha2_password` first. Corrected.
+- [done] My own tests were wrong twice, and the code right: a fresh site reports
+  `authentication_failed`, never `database_absent` (the server authenticates before resolving
+  the database — family invariant AD-29); and `db_version` 58975 maps to WordPress **6.7**,
+  the release that *introduced* the schema, not 6.8 which also reports it.
+- [done] My first PRD reconciliation pass was **not uniform** — some sections swept, others
+  untouched — which is worse than marking nothing, because a reader who trusts the loud
+  markers reads the silent gaps as verified. A rubric review caught it; the second pass fixed
+  it. If you reconcile anything here, do it section by section to completion.
+
+## One trap that gets checks deleted rather than fixed
+
+Verifying "no development dependency source leaked into a release" by grepping a wheel's
+`METADATA` for a hostname reports a leak on a **completely clean artifact** — `Project-URL`
+entries and the README carried in the long description both legitimately contain `github.com`.
+Two sessions hit this independently. The check must inspect `Requires-Dist` **lines** for
+`git+`, `@ git`, `file://` or `@ http(s)://`. `tools/check_dist_metadata.py` does it that way
+and says why in its docstring; do not "simplify" it into a grep.
+
+## Where the durable knowledge lives
+
+Five notes are already in the shared basic-memory KB under `home-lab` — act behaviour, GitHub
+Actions versioning and matrix traps, Python toolchain traps (uv/ruff/PEP 420), the Gitea
+registry, and MySQL provisioning invariants. Read those rather than rediscovering; this
+handoff deliberately does not repeat them.
+
+Credentials: the Gitea publish credential is a username plus the Gitea token, held in
+Infisical (project id and environment are recorded in `~/.actrc`'s comments and in the KB note
+on the registry). The `PYPI_CUSTOM_USERNAME`/`PASSWORD` pair in Infisical does **not** work
+against `git.ravenwolf.org`. No values anywhere in this repo.
+
+## Inferences, marked as such
+
+- My session name `wordpress-database` is **inferred** from the peer naming convention and
+  confirmed by the agent listing; the filename follows from it.
+- That the architecture record *should* be a pointer rather than a local doc is **my
+  recommendation, not a decision**. Shawn has not ruled.
+- The claim that FR-29's correlation identifier "adds little" is **a reviewer's argument I
+  found persuasive**, not a tested conclusion.

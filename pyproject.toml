@@ -50,10 +50,12 @@ wpconfig = ["l3io-wp-config>=1.5.0"]
 # the release is correctly shaped either way and only this block changes when
 # the package reaches PyPI.
 #
-# Pinned to an exact rev, not `branch = "main"`: a branch re-resolves on every
-# `uv lock -U`, which exposed this package to upstream pushes. Switch to
-# `tag = "v1.5.0"` once that tag exists -- it does not yet; upstream tags stop
-# at v1.4.
+# Pinned to an annotated tag, not `branch = "main"`: a branch re-resolves on
+# every `uv lock -U`, which exposed this package to upstream pushes. The tag is
+# immutable in practice and names a VERSION rather than a commit, so `>=1.5.0`
+# will mean the same thing after a PyPI release as it does now. Verified
+# behaviour-neutral against the previous rev pin: the 5 intervening commits
+# touch AGENTS.md only, nothing under src/ or tests/.
 #
 # This MUST NOT reach a published release: a VCS dependency in published
 # metadata is exactly the defect that left wpbackup2 unresolvable for six
@@ -68,7 +70,7 @@ wpconfig = ["l3io-wp-config>=1.5.0"]
 required-version = "==0.11.6"
 
 [tool.uv.sources]
-l3io-wp-config = { git = "https://github.com/ravensorb/py-wpconfigr.git", rev = "65afe3ef0b602512d69cb78c777487258398188c" }
+l3io-wp-config = { git = "https://github.com/ravensorb/py-wpconfigr.git", tag = "v1.5.0" }
 
 [project.scripts]
 l3io-wp-database = "l3io.wp.database.cli:main"
