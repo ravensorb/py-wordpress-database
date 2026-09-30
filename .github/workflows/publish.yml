@@ -178,6 +178,31 @@ jobs:
           print(f"import ok, one version: {attr}")
           PY
 
+      - name: a tagged publish must not ship a dev version
+        # A dev build derives <next patch>.devN, and with the first release at
+        # 0.0.1 the untagged fallback 0.1.devN sorts ABOVE it in PEP 440 -- so a
+        # dev artifact reaching a registry as a release would outrank the release
+        # permanently. Verified with packaging.version rather than assumed.
+        #
+        # Conditioned on a tag, because a dev build reaching the internal mirror is
+        # deliberate: `make release dev` exists to do exactly that, with no tag and
+        # no GitHub release.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          wheel=$(find dist -maxdepth 1 -name '*.whl')
+          built=$(uv run --isolated --no-project --python "${{ matrix.python }}" \
+                    --with "$wheel" \
+                    python -c "from importlib.metadata import version; print(version('l3io-wp-database'))")
+          python3 - "$built" <<'PY'
+          import sys
+          from packaging.version import Version
+          built = Version(sys.argv[1])
+          if built.is_devrelease or built.is_prerelease:
+              raise SystemExit(f"built version {built} is a dev/pre-release; a tag must ship a final version")
+          print(f"built version {built} is a final release")
+          PY
+
       - name: a tag must agree with the artifact it publishes
         # The authoritative tag check, moved here from version-gate because this
         # is where the artifact exists. Compares the tag against the wheel's own
