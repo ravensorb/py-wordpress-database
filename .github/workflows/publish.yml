@@ -386,27 +386,25 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { name: dist, path: dist }
 
-      - name: the version without its v prefix
-        id: version
-        run: |
-          set -euo pipefail
-          echo "number=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: read this version's entry from the changelog
-        # Turns "update the changelog before releasing" from a habit into a gate:
-        # validation-level=error fails the release when CHANGELOG.md has no entry
-        # for the tag being released, so the notes cannot silently go missing.
+      - name: build the release notes from the commit log
+        # Notes come from commit messages, not a hand-maintained file: one source
+        # rather than two that drift. COMMIT mode because this repo's history is
+        # direct commits to main -- PR mode, the action's default, would return
+        # nothing here.
         #
-        # Written to a file rather than an output because the entry is long and
-        # contains backticks, pipes and quotes -- passing it through a YAML
-        # expression mangles it.
-        id: changelog
-        uses: LiquidLogicLabs/git-action-changelog-parser@v2
+        # `configuration` is a path READ FROM THE WORKING TREE, which is why the
+        # job checks out above. A release job that only downloads the artifact has
+        # no working tree, so the config would be silently absent and the builder
+        # would fall back to its defaults with no error.
+        id: notes
+        uses: LiquidLogicLabs/git-action-release-changelog-builder@v3
         with:
-          path: CHANGELOG.md
-          version: ${{ steps.version.outputs.number }}
-          validation-level: error
-          output-file: .release-notes.md
+          platform: github
+          token: ${{ secrets.GITHUB_TOKEN }}
+          mode: COMMIT
+          to-tag: ${{ github.ref_name }}
+          configuration: .github/changelog-config.json
+          fail-on-error: 'false'
 
       - name: create the release
         # The org's action rather than `gh release create`, because it speaks
@@ -419,10 +417,11 @@ jobs:
           tag: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           artifacts: dist/*
-          # The hand-written entry, not generated notes. The changelog records
-          # intent -- why a behaviour changed, and one case where it deliberately
-          # did not -- which a commit list cannot reconstruct.
-          body-file: .release-notes.md
+          body: ${{ steps.notes.outputs.changelog }}
+          # The fallback: if the build returns nothing -- no commits in range, or
+          # the action erred with fail-on-error false -- the platform generator
+          # runs instead, so a release is never published bodyless.
+          generate-release-notes: ${{ steps.notes.outputs.changelog == '' }}
           # A release is cut once. Refuse to overwrite one, because the registry
           # filename behind it is already spent.
           allow-updates: 'false'

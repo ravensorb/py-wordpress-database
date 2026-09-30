@@ -1,6 +1,14 @@
-# Changelog
+# The 1.0.0 rewrite: what changed, and what deliberately did not
 
-## [1.0.0] - 2026-09-29
+Release notes are built from commit messages by
+`git-action-release-changelog-builder`, so this file is **not** a changelog and
+nothing reads it. It is kept because it holds analysis a commit log cannot
+reconstruct -- in particular the section below on a change that did **not**
+happen, and the evidence for why.
+
+See [migration.md](migration.md) for the `wpdatabase2` API mapping.
+
+## The rewrite
 
 A full internal rewrite. The package is renamed, re-namespaced, and its
 behaviour corrected. Nothing is preserved from the `wpdatabase2` public API;

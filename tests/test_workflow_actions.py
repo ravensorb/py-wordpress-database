@@ -109,3 +109,67 @@ def test_the_changelog_actions_are_not_confused(refs: dict[str, set[str]]) -> No
         "git-action-changelog-parser has no v3 -- v3 belongs to "
         "git-action-release-changelog-builder, whose name differs by two words"
     )
+
+
+def test_the_changelog_config_never_drops_an_entry() -> None:
+    """``defaultCategory: ""`` is the one setting that silently discards entries.
+
+    This action appends an entry matching no category under ``defaultCategory``,
+    so nothing is lost by default -- the upstream ``mikepenz`` action DROPS such
+    entries when the template omits ``#{{UNCATEGORIZED}}``, and that difference is
+    easy to carry across as a false belief. Verified against this action's README:
+    "by default, appended under defaultCategory (## Other Changes), so nothing is
+    silently lost". The real hazard is emptying that key.
+    """
+    import json
+
+    path = REPO_ROOT / ".github" / "changelog-config.json"
+    if not path.is_file():
+        pytest.skip("no changelog config in this tree")
+
+    config = json.loads(path.read_text(encoding="utf-8"))
+    assert config.get("defaultCategory"), (
+        'defaultCategory must be non-empty; "" silently discards every entry that '
+        "matches no category, which for a release note is unrecoverable"
+    )
+    # Commit bodies in this repo run to dozens of lines; a body in the template
+    # turns each release note into a transcript.
+    assert "#{{BODY}}" not in config.get("commit_template", ""), (
+        "commit_template must be subject-only"
+    )
+
+
+def test_a_job_reading_the_changelog_config_checks_out() -> None:
+    """``configuration:`` is a path read from the working tree.
+
+    A release job that only downloads the built artifact has no working tree, so
+    the config file is simply absent and the builder falls back to its defaults
+    with no error and no warning -- a silent downgrade of every release note.
+    Derived by finding the jobs that actually use the input, rather than naming
+    the release job, so a second consumer is covered when it appears.
+    """
+    if not WORKFLOWS.is_dir():
+        pytest.skip("no workflows in this tree")
+
+    checked = 0
+    for workflow in sorted(WORKFLOWS.glob("*.yml")):
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        for job_name, job in (document.get("jobs") or {}).items():
+            steps = job.get("steps") or []
+            wants_config = any(
+                "changelog-builder" in str(step.get("uses", ""))
+                and (step.get("with") or {}).get("configuration")
+                for step in steps
+            )
+            if not wants_config:
+                continue
+            checked += 1
+            has_checkout = any(
+                str(step.get("uses", "")).startswith("actions/checkout") for step in steps
+            )
+            assert has_checkout, (
+                f"{workflow.name}:{job_name} passes `configuration:` but never checks "
+                "out, so the config file is absent and the builder uses its defaults"
+            )
+
+    assert checked, "no job passes `configuration:` -- this guard is vacuous"
