@@ -399,12 +399,12 @@ wheels = [
 ]
 
 [[package]]
-name = "l3io-wp-config"
-version = "1.5.0"
-source = { git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846#87c7a6610f0dc31eeb037c4e1c393e5fbe145846" }
+name = "l3io-wordpress-config"
+version = "0.0.2"
+source = { git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v0.0.2#1cf189432698c285ba3741637c1bc7a23a38d6a4" }
 
 [[package]]
-name = "l3io-wp-database"
+name = "l3io-wordpress-database"
 source = { editable = "." }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -417,13 +417,13 @@ aws = [
     { name = "boto3" },
 ]
 wpconfig = [
-    { name = "l3io-wp-config" },
+    { name = "l3io-wordpress-config" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "boto3" },
-    { name = "l3io-wp-config" },
+    { name = "l3io-wordpress-config" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -436,7 +436,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34" },
-    { name = "l3io-wp-config", marker = "extra == 'wpconfig'", git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846" },
+    { name = "l3io-wordpress-config", marker = "extra == 'wpconfig'", git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v0.0.2" },
     { name = "opentelemetry-api", specifier = ">=1.30" },
     { name = "pymysql", extras = ["rsa"], specifier = ">=1.2.0" },
     { name = "structlog", specifier = ">=26.1.0" },
@@ -446,7 +446,7 @@ provides-extras = ["aws", "wpconfig"]
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3", specifier = ">=1.34" },
-    { name = "l3io-wp-config", git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846" },
+    { name = "l3io-wordpress-config", git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v0.0.2" },
     { name = "mypy", specifier = "==2.3.1" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },

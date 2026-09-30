@@ -1,4 +1,4 @@
-# l3io-wp-database CI.
+# l3io-wordpress-database CI.
 #
 # Every mechanical gate this package relies on runs here, and every job also
 # runs locally under nektos/act with no edits. Publishing lives in publish.yml,
@@ -318,4 +318,4 @@ jobs:
           fi
           wheel=$(find dist-verify -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
-                 --with "$wheel" l3io-wp-database --version
+                 --with "$wheel" l3io-wordpress-database --version

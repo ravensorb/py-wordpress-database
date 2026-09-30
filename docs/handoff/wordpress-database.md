@@ -7,7 +7,7 @@ Written 2026-09-27, at `main` = `945069bf` plus three uncommitted changes (below
 
 ## What I own
 
-This repository only: `l3io-wp-database`, second in a three-package family. The siblings are
+This repository only: `l3io-wordpress-database`, second in a three-package family. The siblings are
 owned by other sessions — `wordpress-config` (`l3io-wp-config`, release position 1) and
 `wordpress-backup` (`l3io-wp-backup`, position 3). Do not edit their repos; message them.
 
@@ -63,11 +63,11 @@ namespace `l3io.wp.database`, nothing preserved from the old surface, no shim.
 - [blocked] **Any PyPI release.** `l3io-wp-config` is tagged, released and mirrored to the
   internal Gitea registry but is **not resolvable from PyPI** — a GitHub Release is not an
   index. Publishing this package while that holds makes
-  `pip install l3io-wp-database[wpconfig]` unresolvable, reproducing the exact outage this
+  `pip install l3io-wordpress-database[wpconfig]` unresolvable, reproducing the exact outage this
   rewrite repairs. Family invariant AD-15. Publication goes bottom-up: config, then database,
   then backup.
 - [blocked] Nothing is published anywhere. `publish.yml` is registered and dispatchable but
-  has never run; `l3io-wp-database` returns 404 from the Gitea index. Release is Shawn's call,
+  has never run; `l3io-wordpress-database` returns 404 from the Gitea index. Release is Shawn's call,
   not an agent's. The first run should target `mirror` — Gitea packages are deletable, PyPI
   burns a filename permanently.
 

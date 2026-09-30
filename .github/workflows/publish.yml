@@ -1,4 +1,4 @@
-# l3io-wp-database publishing.
+# l3io-wordpress-database publishing.
 #
 # Deliberately a separate file from ci.yml, not a guarded job inside it. act has
 # no OIDC and ignores `job.permissions` entirely, so an `if:` guard would not
@@ -176,11 +176,11 @@ jobs:
           from importlib.metadata import version
           from l3io.wp import database
           attr = database.__version__
-          dist = version("l3io-wp-database")
+          dist = version("l3io-wordpress-database")
           if attr != dist:
               raise SystemExit(
                   f"version drift: l3io.wp.database.__version__ is {attr!r} "
-                  f"but the l3io-wp-database distribution reports {dist!r}"
+                  f"but the l3io-wordpress-database distribution reports {dist!r}"
               )
           print(f"import ok, one version: {attr}")
           PY
@@ -200,7 +200,7 @@ jobs:
           wheel=$(find dist -maxdepth 1 -name '*.whl')
           built=$(uv run --isolated --no-project --python "${{ matrix.python }}" \
                     --with "$wheel" \
-                    python -c "from importlib.metadata import version; print(version('l3io-wp-database'))")
+                    python -c "from importlib.metadata import version; print(version('l3io-wordpress-database'))")
           python3 - "$built" <<'PY'
           import sys
           from packaging.version import Version
@@ -233,7 +233,7 @@ jobs:
           wheel=$(find dist -maxdepth 1 -name '*.whl')
           built=$(uv run --isolated --no-project --python "${{ matrix.python }}" \
                     --with "$wheel" \
-                    python -c "from importlib.metadata import version; print(version('l3io-wp-database'))")
+                    python -c "from importlib.metadata import version; print(version('l3io-wordpress-database'))")
           tagged="${GITHUB_REF_NAME#v}"
           if [ "$built" != "$tagged" ]; then
             echo "::error::tag $tagged does not match the built version $built"
@@ -256,7 +256,7 @@ jobs:
           fi
           wheel=$(find dist -maxdepth 1 -name '*.whl')
           uv run --isolated --no-project --python "${{ matrix.python }}" \
-                 --with "$wheel" l3io-wp-database --version
+                 --with "$wheel" l3io-wordpress-database --version
       - name: base install pulls no optional dependency
         run: |
           set -euo pipefail
@@ -370,8 +370,8 @@ jobs:
           fi
           wheel=$(find dist -maxdepth 1 -name '*.whl')
           base=$(basename "$wheel")
-          # PEP 503 normalisation: the wheel says l3io_wp_database, the index
-          # wants l3io-wp-database.
+          # PEP 503 normalisation: the wheel says l3io_wordpress_database, the index
+          # wants l3io-wordpress-database.
           name=$(printf '%s' "${base%%-*}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[-_.]+/-/g')
           echo "looking for $base under $name"
           code=$(curl -sS -o /tmp/simple.html -w '%{http_code}' \
@@ -491,7 +491,7 @@ jobs:
     #
     # Nothing may go to PyPI until every dependency beneath it can resolve from
     # PyPI too: publishing this while l3io-wp-config exists only on the internal
-    # registry would make `pip install l3io-wp-database[wpconfig]` unresolvable,
+    # registry would make `pip install l3io-wordpress-database[wpconfig]` unresolvable,
     # reproducing the outage this rewrite exists to repair.
     name: PyPI
     runs-on: ubuntu-latest

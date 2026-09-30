@@ -1,6 +1,6 @@
 # Migrating from `wpdatabase2`
 
-`l3io-wp-database` is a rewrite, not a new version of `wpdatabase2`: nothing of
+`l3io-wordpress-database` is a rewrite, not a new version of `wpdatabase2`: nothing of
 the old public API is preserved, and there is no compatibility shim. The table
 below maps every entry point that existed before onto its replacement.
 

@@ -44,7 +44,7 @@ class MissingDependencyError(WpDatabaseError):
         self.distribution = distribution
         super().__init__(
             f"this feature needs {distribution!r}, which is not installed. "
-            f"Install it with: pip install 'l3io-wp-database[{extra}]'"
+            f"Install it with: pip install 'l3io-wordpress-database[{extra}]'"
         )
 
 

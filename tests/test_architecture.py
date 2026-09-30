@@ -99,7 +99,7 @@ def test_built_wheel_has_no_namespace_init() -> None:
         check=True,
         capture_output=True,
     )
-    wheels = sorted(dist.glob("l3io_wp_database-*.whl"))
+    wheels = sorted(dist.glob("l3io_wordpress_database-*.whl"))
     assert wheels, "no wheel was produced"
     names = zipfile.ZipFile(wheels[-1]).namelist()
     assert "l3io/__init__.py" not in names

@@ -49,7 +49,7 @@ class Exit(IntEnum):
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
     parser = argparse.ArgumentParser(
-        prog="l3io-wp-database",
+        prog="l3io-wordpress-database",
         description=("Create and inspect WordPress MySQL databases and their users, idempotently."),
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")

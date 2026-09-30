@@ -12,7 +12,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 #: Distribution name, which is what carries the version metadata.
-_DISTRIBUTION = "l3io-wp-database"
+_DISTRIBUTION = "l3io-wordpress-database"
 
 try:
     __version__ = version(_DISTRIBUTION)

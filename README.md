@@ -1,4 +1,4 @@
-# l3io-wp-database
+# l3io-wordpress-database
 
 Create and inspect WordPress MySQL databases and their users, idempotently.
 
@@ -20,9 +20,9 @@ creating, and are never defaulted to the WordPress account.
 ## Installing
 
 ```shell
-pip install l3io-wp-database              # core: PyMySQL, structlog, opentelemetry-api
-pip install 'l3io-wp-database[aws]'       # + AWS Secrets Manager credentials
-pip install 'l3io-wp-database[wpconfig]'  # + reading wp-config.php
+pip install l3io-wordpress-database              # core: PyMySQL, structlog, opentelemetry-api
+pip install 'l3io-wordpress-database[aws]'       # + AWS Secrets Manager credentials
+pip install 'l3io-wordpress-database[wpconfig]'  # + reading wp-config.php
 ```
 
 Optional dependencies are optional *imports*: the core never imports `boto3` or
@@ -90,14 +90,14 @@ decide what exists.
 
 ```shell
 # report state; changes nothing, needs no administrative credentials
-l3io-wp-database --inspect --wp-config /var/www/wp-config.php
+l3io-wordpress-database --inspect --wp-config /var/www/wp-config.php
 
 # provision
-l3io-wp-database --wp-config /var/www/wp-config.php \
+l3io-wordpress-database --wp-config /var/www/wp-config.php \
     --admin-username root --admin-password secret
 
 # administrative credentials from AWS Secrets Manager (needs the 'aws' extra)
-l3io-wp-database --wp-config /var/www/wp-config.php \
+l3io-wordpress-database --wp-config /var/www/wp-config.php \
     --admin-credentials-aws-secret-id AdminSecretId \
     --admin-credentials-aws-region eu-west-1
 ```

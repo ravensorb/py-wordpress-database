@@ -1,9 +1,9 @@
 <!-- bmad:context -->
-<!-- Verified 2026-09-17 against e82e6aa plus the rewrite on feat/l3io-wp-database.
+<!-- Verified 2026-09-17 against e82e6aa plus the rewrite on feat/l3io-wordpress-database.
      Managed by bmad-project-context; edits inside this block are replaced on
      refresh. Keep anything you want preserved outside the markers. -->
 
-## l3io-wp-database
+## l3io-wordpress-database
 
 Creates and inspects WordPress MySQL databases and their users, idempotently.
 Imports as `l3io.wp.database`, a PEP 420 namespace shared with `l3io-wp-config`

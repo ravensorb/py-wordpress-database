@@ -16,7 +16,7 @@ see [docs/migration.md](docs/migration.md).
 
 ### Renamed
 
-- Distribution `wpdatabase2` becomes **`l3io-wp-database`**; import path
+- Distribution `wpdatabase2` becomes **`l3io-wordpress-database`**; import path
   `wpdatabase2` becomes **`l3io.wp.database`**, a PEP 420 namespace shared with
   `l3io-wp-config` and `l3io-wp-backup`.
 - No compatibility shim is published. No release of `wpdatabase2` was ever
