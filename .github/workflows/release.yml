@@ -155,6 +155,27 @@ jobs:
           update-existing: 'false'
           force: 'false'
 
+      - name: hand the new tag to publish.yml
+        # REQUIRED, not a convenience. GitHub does not trigger workflows from a ref
+        # created with GITHUB_TOKEN, so the tag above fires no push event and
+        # publish.yml would never run -- the tag would sit there unpublished while
+        # this workflow reported success. Verified: v0.0.1 in py-wordpress-database
+        # was created by the action and produced ZERO Publish runs.
+        #
+        # Dispatched AT the new tag, so github.ref is that tag inside publish.yml
+        # and its tag-gated jobs -- version gate, mirror, release -- all apply.
+        if: inputs.bump != 'dev'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: v${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run publish.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "${NEXT}" \
+            -f target=mirror
+          echo "::notice::dispatched publish.yml at ${NEXT}"
+
       - name: summary
         if: inputs.bump != 'dev'
         run: |
