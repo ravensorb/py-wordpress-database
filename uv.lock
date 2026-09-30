@@ -401,7 +401,7 @@ wheels = [
 [[package]]
 name = "l3io-wp-config"
 version = "1.5.0"
-source = { git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v1.5.0#87c7a6610f0dc31eeb037c4e1c393e5fbe145846" }
+source = { git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846#87c7a6610f0dc31eeb037c4e1c393e5fbe145846" }
 
 [[package]]
 name = "l3io-wp-database"
@@ -436,7 +436,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34" },
-    { name = "l3io-wp-config", marker = "extra == 'wpconfig'", git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v1.5.0" },
+    { name = "l3io-wp-config", marker = "extra == 'wpconfig'", git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846" },
     { name = "opentelemetry-api", specifier = ">=1.30" },
     { name = "pymysql", extras = ["rsa"], specifier = ">=1.2.0" },
     { name = "structlog", specifier = ">=26.1.0" },
@@ -446,7 +446,7 @@ provides-extras = ["aws", "wpconfig"]
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3", specifier = ">=1.34" },
-    { name = "l3io-wp-config", git = "https://github.com/ravensorb/py-wpconfigr.git?tag=v1.5.0" },
+    { name = "l3io-wp-config", git = "https://github.com/ravensorb/py-wpconfigr.git?rev=87c7a6610f0dc31eeb037c4e1c393e5fbe145846" },
     { name = "mypy", specifier = "==2.3.1" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
