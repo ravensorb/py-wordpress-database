@@ -173,3 +173,40 @@ def test_a_job_reading_the_changelog_config_checks_out() -> None:
             )
 
     assert checked, "no job passes `configuration:` -- this guard is vacuous"
+
+
+def test_no_workflow_shells_out_to_dispatch_another() -> None:
+    """Dispatching uses the org's action, not `gh workflow run` in a run: block.
+
+    Two reasons, and the second is the one that bites. The org action speaks Gitea
+    as well as GitHub, so the same step works against the self-hosted instance
+    without a second implementation. And its `workflow-name` input takes the
+    workflow's TOP-LEVEL ``name:`` field rather than its filename, which is a
+    distinction a hand-rolled `gh workflow run publish.yml` hides -- the CLI accepts
+    the filename, so the two spellings are not interchangeable and moving between
+    them silently dispatches nothing if the wrong one is used.
+
+    Comments and documentation are exempt: this reads parsed `run:` bodies, not the
+    file text, so the usage examples in a header stay.
+    """
+    if not WORKFLOWS.is_dir():
+        pytest.skip("no workflows in this tree")
+
+    checked = 0
+    offenders: list[str] = []
+    for workflow in sorted(WORKFLOWS.glob("*.yml")):
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        for job_name, job in (document.get("jobs") or {}).items():
+            for index, step in enumerate(job.get("steps") or []):
+                body = str(step.get("run", ""))
+                if not body:
+                    continue
+                checked += 1
+                if "gh workflow run" in body:
+                    offenders.append(f"{workflow.name}:{job_name}[step {index}]")
+
+    assert checked, "no run: steps found -- this guard is vacuous"
+    assert not offenders, (
+        "use LiquidLogicLabs/git-action-trigger-workflow instead of shelling out "
+        f"to `gh workflow run`: {offenders}"
+    )

@@ -3,7 +3,7 @@
 #   gh workflow run release.yml -f bump=patch     ->  v0.0.1 -> v0.0.2
 #   gh workflow run release.yml -f bump=minor     ->  v0.0.1 -> v0.1.0
 #   gh workflow run release.yml -f bump=major     ->  v0.0.1 -> v1.0.0
-#   gh workflow run release.yml -f bump=dev       ->  publishes 1.0.1.devN, no tag
+#   gh workflow run release.yml -f bump=dev       ->  publishes 0.0.2.devN, no tag
 #
 # This file only ever CREATES A TAG. Everything after that -- build, smoke,
 # mirror, GitHub release -- is publish.yml reacting to the tag, so there is one
@@ -47,16 +47,18 @@ jobs:
       # the last tag already determines it. Hand straight over to publish.yml,
       # which is the only thing that publishes.
       - name: dev build -- publish this commit to the mirror
+        # The org's action rather than `gh workflow run`: it speaks Gitea as well
+        # as GitHub, so this step does not need a second implementation later.
+        #
+        # workflow-name is publish.yml's TOP-LEVEL `name:` field -- "Publish" --
+        # not its filename. Passing the filename dispatches nothing.
         if: inputs.bump == 'dev'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh workflow run publish.yml \
-            --repo "${GITHUB_REPOSITORY}" \
-            --ref "${GITHUB_REF_NAME}" \
-            -f target=mirror
-          echo "::notice::dispatched a dev publish for ${GITHUB_SHA}; the version is derived from the commit distance"
+        uses: LiquidLogicLabs/git-action-trigger-workflow@v2
+        with:
+          workflow-name: Publish
+          ref: ${{ github.ref_name }}
+          inputs: '{"target":"mirror"}'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: what is the latest release tag?
         if: inputs.bump != 'dev'
@@ -159,22 +161,22 @@ jobs:
         # REQUIRED, not a convenience. GitHub does not trigger workflows from a ref
         # created with GITHUB_TOKEN, so the tag above fires no push event and
         # publish.yml would never run -- the tag would sit there unpublished while
-        # this workflow reported success. Verified: v0.0.1 in py-wordpress-database
-        # was created by the action and produced ZERO Publish runs.
+        # this workflow reported success. Verified: v0.0.1 was created by the action
+        # and produced ZERO Publish runs.
         #
         # Dispatched AT the new tag, so github.ref is that tag inside publish.yml
         # and its tag-gated jobs -- version gate, mirror, release -- all apply.
+        #
+        # workflow-name is publish.yml's TOP-LEVEL `name:` field, "Publish", not its
+        # filename. The action's own documentation is explicit about it, and the
+        # filename would dispatch nothing.
         if: inputs.bump != 'dev'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT: v${{ steps.next.outputs.version }}
-        run: |
-          set -euo pipefail
-          gh workflow run publish.yml \
-            --repo "${GITHUB_REPOSITORY}" \
-            --ref "${NEXT}" \
-            -f target=mirror
-          echo "::notice::dispatched publish.yml at ${NEXT}"
+        uses: LiquidLogicLabs/git-action-trigger-workflow@v2
+        with:
+          workflow-name: Publish
+          ref: v${{ steps.next.outputs.version }}
+          inputs: '{"target":"mirror"}'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: summary
         if: inputs.bump != 'dev'
