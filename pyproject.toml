@@ -131,13 +131,15 @@ local_scheme = "no-local-version"
 # sorts ABOVE 1.0.0 in PEP 440, so publishing one would have permanently
 # outranked the release.
 #
-# CAUTION, and this changed when the first release became 0.0.1: an untagged tree
-# falls back to 0.1.devN, and 0.1.dev1 > 0.0.1 in PEP 440 -- verified, not
-# assumed. So the fallback is NOT safe below the 0.x line the way it was below
-# 1.0.0, and a dev build published before the first tag exists would outrank it.
-# What prevents that is the `smoke` job refusing to ship a dev version on a tag,
-# plus the fact that once v0.0.1 exists every dev build derives 0.0.2.devN, which
-# sorts above it correctly. The window is only before the first tag.
+# The match also needs a three-component ancestor to find, which is what the
+# v0.0.0 BASELINE tag provides. Without it the fallback was 0.1.devN, and
+# 0.1.dev1 > 0.0.1 in PEP 440 -- verified, not assumed -- so a dev build published
+# before the first release would have outranked it permanently. From the baseline
+# an untagged tree derives 0.0.1.devN, which sorts below 0.0.1.
+#
+# v0.0.0 is not a release and is excluded from publish.yml's tag trigger. It also
+# bounds release notes to the rewrite: 12 commits from the baseline, against 46
+# from the 2018 v1.0 tag, 35 of which predate the rewrite entirely.
 git_describe_command = "git describe --dirty --tags --long --match v[0-9]*.[0-9]*.[0-9]*"
 
 [tool.hatch.build.targets.wheel]
